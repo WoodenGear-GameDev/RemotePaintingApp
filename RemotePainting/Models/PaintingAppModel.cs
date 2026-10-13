@@ -31,17 +31,17 @@ namespace RemotePainting.Models
             _networkService = null;
         }
 
-        public void SetDisconectedEvent(Action onDisconnected)
+        public async Task RefreshAvailableServers(CancellationToken cancellationToken)
+        {
+            Servers = await Networking.Network.DiscoverAllServersAsync(_port, TimeSpan.FromSeconds(3), cancellationToken);
+        }
+
+        public void SetDisconnectedEvent(Action onDisconnected)
         {
             if (_networkService != null)
             {
                 _networkService.Disconnected += onDisconnected;
             }
-        }
-
-        public async Task RefreshAvailableServers(CancellationToken cancellationToken)
-        {
-            Servers = await Networking.Network.DiscoverAllServersAsync(_port, TimeSpan.FromSeconds(3), cancellationToken);
         }
     }
 }

@@ -15,7 +15,7 @@ namespace RemotePainting.ViewModels.Menus
         {
             _navigation = navigation;
             _paintingAppModel = paintingAppModel;
-            _paintingAppModel.SetDisconectedEvent(OnDisconnectedFromServer);
+            _paintingAppModel.SetDisconnectedEvent(OnDisconnectedFromServer);
         }
 
         public void OnDisconnectedFromServer()
