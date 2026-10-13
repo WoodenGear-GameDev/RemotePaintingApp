@@ -11,6 +11,7 @@ namespace RemotePainting.Models
 {
     internal class PaintingAppModel
     {
+         private static readonly CultureInfo IC = CultureInfo.InvariantCulture;
         public event Action<string>? OnErrorOccurred;
         public event Action<string>? OnDrawDataReceived;
         private INetworkService? _networkService;
@@ -26,27 +27,30 @@ namespace RemotePainting.Models
 
         public void SendDrawingData(DrawCommand dCmd)
         {
-            System.Diagnostics.Debug.WriteLine($"Отправка данных");
-            string data = string.Empty;
+            string data;
             switch (dCmd)
             {
                 case BeginStroke b:
-                    data = $"DRAW:BEGIN_STROKE:{b.Author}|{b.Id}|{b.Color}|{b.Thickness}|{b.X}|{b.Y}";
+                    data = string.Create(IC, $"DRAW:BEGIN_STROKE:{b.Author}|{b.Id}|{b.Color}|{b.Thickness}|{b.X}|{b.Y}");
                     break;
-
+ 
                 case AddPoint a:
-                    data = $"DRAW:ADD_POINT:{a.Author}|{a.Id}|{a.X}|{a.Y}";
+                    data = string.Create(IC, $"DRAW:ADD_POINT:{a.Author}|{a.Id}|{a.X}|{a.Y}");
                     break;
-
+ 
                 case RemoveStroke r:
-                    data = $"DRAW:REMOVE_STROKE:{r.Author}|{r.Id}";
+                    data = string.Create(IC, $"DRAW:REMOVE_STROKE:{r.Author}|{r.Id}");
                     break;
-
+ 
                 case ClearAll:
                     data = "DRAW:CLEAR_ALL";
                     break;
+ 
+                default:
+                    return;
             }
-            _networkService!.SendData(data);
+ 
+            _networkService?.SendData(data);
             System.Diagnostics.Debug.WriteLine($"SEND:  {data}");
         }
 
