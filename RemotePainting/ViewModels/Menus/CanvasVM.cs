@@ -1,6 +1,7 @@
 ﻿using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using RemotePainting.Controls;
 using RemotePainting.Models;
 using RemotePainting.Networking;
 using System.Collections.Generic;
@@ -23,6 +24,11 @@ namespace RemotePainting.ViewModels.Menus
             _navigation = navigation;
             _paintingAppModel = paintingAppModel;
             _paintingAppModel.SetDisconnectedEvent(OnDisconnectedFromServer);
+        }
+
+        public void AttachBoard(IDrawingBoard board)
+        {
+            _paintingAppModel.AttachBoard(board);
         }
 
         public void OnDisconnectedFromServer()

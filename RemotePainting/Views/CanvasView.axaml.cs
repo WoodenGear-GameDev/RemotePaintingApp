@@ -1,6 +1,7 @@
 ﻿using Avalonia.Controls;
 using Avalonia.Interactivity;
 using RemotePainting.ViewModels;
+using RemotePainting.ViewModels.Menus;
 
 namespace RemotePainting.Views;
 
@@ -9,6 +10,14 @@ public partial class CanvasView : UserControl
     public CanvasView()
     {
         InitializeComponent();
+
+        Loaded += (s, e) =>
+        {
+            if (DataContext is CanvasVM vm)
+            {
+                vm.AttachBoard(Board);
+            }
+        };
     }
 
     private void Undo_Click(object? sender, RoutedEventArgs e) => Board.Undo();

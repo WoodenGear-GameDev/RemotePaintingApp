@@ -40,6 +40,7 @@ namespace RemotePainting.ViewModels.Menus
         [RelayCommand]
         private async Task ConnectToServer(ServerInfo selectedServer)
         {
+            System.Diagnostics.Debug.WriteLine($"{selectedServer.IpAddress}");
             if (selectedServer == null) return;
 
             _paintingAppModel.ConnectToCanvas(selectedServer.IpAddress);

@@ -68,18 +68,17 @@ namespace RemotePainting.Networking
     }
     public interface INetworkService
     {
-        //Task SendMessageAsync(string strokeData);
-
-        event Action<string> StrokeReceived;
+        event Action<string> OnDataReceived;
         event Action Disconnected;
 
         void Start();
         void Stop();
+        Task SendData(string data);
     }
 
     internal class Client : INetworkService
     {
-        public event Action<string>? StrokeReceived;
+        public event Action<string>? OnDataReceived;
         public event Action? Disconnected;
         private readonly string _serverIp = String.Empty;
         private readonly int _port;
@@ -199,6 +198,7 @@ namespace RemotePainting.Networking
 
         private async Task StartListeningServer(Stream stream, CancellationToken cancellationToken)
         {
+            System.Diagnostics.Debug.WriteLine($"StartListening");
             try
             {
                 while (!cancellationToken.IsCancellationRequested)
@@ -210,6 +210,8 @@ namespace RemotePainting.Networking
                         Disconnected?.Invoke();
                         break;
                     }
+                    string data = Encoding.UTF8.GetString(buffer, 0, byteAmount);
+                    OnDataReceived?.Invoke(data);
                 }
             }
             catch (Exception)
@@ -218,7 +220,7 @@ namespace RemotePainting.Networking
             }
         }
 
-        private async Task SendMessageAsync(string message)
+        public async Task SendData(string message)
         {
             byte[] messageBytes = Encoding.UTF8.GetBytes(message);
 
@@ -239,7 +241,7 @@ namespace RemotePainting.Networking
 
     internal class Server : INetworkService
     {
-        public event Action<string>? StrokeReceived;
+        public event Action<string>? OnDataReceived;
         public event Action? Disconnected;
         private readonly int _port;
         public bool IsRunning { get; private set; }
@@ -274,7 +276,10 @@ namespace RemotePainting.Networking
                 {
                     if (ip.AddressFamily == AddressFamily.InterNetwork)
                     {
-                        return $"SERVER:{hostName}|{ip}";
+                        if (ip.ToString().StartsWith("192.168.") || ip.ToString().StartsWith("10."))
+                        {
+                            return $"SERVER:{hostName}|{ip}";
+                        }
                     }
                 }
             }
@@ -445,6 +450,8 @@ namespace RemotePainting.Networking
                         }
 
                         string message = Encoding.UTF8.GetString(buffer, 0, byteAmount);
+                        OnDataReceived?.Invoke(message);
+                        _ = RetransmitData(message, clientInfo.Name);
                     }
                 }
                 catch (Exception)
@@ -457,7 +464,7 @@ namespace RemotePainting.Networking
             }
         }
 
-        private async Task SendMessageAsync(string strokeData)
+        public async Task SendData(string strokeData)
         {
             byte[] messageBytes = Encoding.UTF8.GetBytes(strokeData);
             var disconnectedClients = new List<ClientInfo>();
@@ -474,6 +481,31 @@ namespace RemotePainting.Networking
                 }
             }
 
+            foreach (var clientInfo in disconnectedClients)
+            {
+                clientInfo.Client.Close();
+                _currentClients.Remove(clientInfo);
+            }
+        }
+
+        private async Task RetransmitData(string data, string sourceName)
+        {
+            byte[] messageBytes = Encoding.UTF8.GetBytes(data);
+            var disconnectedClients = new List<ClientInfo>();
+            foreach (var clientInfo in _currentClients)
+            {
+                if (clientInfo.Name != sourceName)
+                {
+                    try
+                    {
+                        await clientInfo.Client.GetStream().WriteAsync(messageBytes, 0, messageBytes.Length);
+                    }
+                    catch (Exception)
+                    {
+                        disconnectedClients.Add(clientInfo);
+                    }
+                }
+            }
             foreach (var clientInfo in disconnectedClients)
             {
                 clientInfo.Client.Close();

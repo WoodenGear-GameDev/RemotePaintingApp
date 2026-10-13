@@ -7,7 +7,7 @@ using System.Collections.Generic;
 
 namespace RemotePainting.Controls
 {
-    public class DrawingCanvas : Control
+    public class DrawingCanvas : Control, IDrawingBoard
     {
         public static readonly StyledProperty<Color> BrushColorProperty =
             AvaloniaProperty.Register<DrawingCanvas, Color>(nameof(BrushColor), Colors.Black);
@@ -28,7 +28,7 @@ namespace RemotePainting.Controls
         }
 
         private readonly List<Stroke> _strokes = new();
-        private readonly Dictionary<int, Stroke> _byId = new();
+        private readonly Dictionary<(string Author, int Id), Stroke> _byId = new();
         private int _currentId = -1;   
         private int _nextId;
 
@@ -41,19 +41,19 @@ namespace RemotePainting.Controls
             switch (cmd)
             {
                 case BeginStroke b:
-                    var s = new Stroke { Id = b.Id, ColorArgb = b.Color, Thickness = b.Thickness };
+                    var s = new Stroke { Author = b.Author, Id = b.Id, ColorArgb = b.Color, Thickness = b.Thickness };
                     s.Points.Add(new Point(b.X, b.Y));
                     _strokes.Add(s);
-                    _byId[s.Id] = s;
+                    _byId[(b.Author, s.Id)] = s;
                     break;
 
                 case AddPoint a:
-                    if (_byId.TryGetValue(a.Id, out var st))
+                    if (_byId.TryGetValue((a.Author, a.Id), out var st))
                         st.Points.Add(new Point(a.X, a.Y));
                     break;
 
                 case RemoveStroke r:
-                    if (_byId.Remove(r.Id, out var rs))
+                    if (_byId.Remove((r.Author, r.Id), out var rs))
                         _strokes.Remove(rs);
                     break;
 
@@ -80,7 +80,7 @@ namespace RemotePainting.Controls
 
             var p = Norm(e.GetPosition(this));
             _currentId = _nextId++;
-            Do(new BeginStroke(_currentId, BrushColor.ToUInt32(), (float)BrushThickness,
+            Do(new BeginStroke("Me", _currentId, BrushColor.ToUInt32(), (float)BrushThickness,
                                (float)p.X, (float)p.Y));
             e.Pointer.Capture(this); 
         }
@@ -91,7 +91,7 @@ namespace RemotePainting.Controls
 
             var p = Norm(e.GetPosition(this));
 
-            if (_byId.TryGetValue(_currentId, out var stroke) && stroke.Points.Count > 0)
+            if (_byId.TryGetValue(("Me", _currentId), out var stroke) && stroke.Points.Count > 0)
             {
                 var last = stroke.Points[^1];
                 var dx = (p.X - last.X) * Bounds.Width;
@@ -99,7 +99,7 @@ namespace RemotePainting.Controls
                 if (dx * dx + dy * dy < MinDistancePx * MinDistancePx) return;
             }
 
-            Do(new AddPoint(_currentId, (float)p.X, (float)p.Y));
+            Do(new AddPoint("Me", _currentId, (float)p.X, (float)p.Y));
         }
 
         protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -111,7 +111,7 @@ namespace RemotePainting.Controls
         public void Undo()
         {
             if (_strokes.Count > 0)
-                Do(new RemoveStroke(_strokes[^1].Id));
+                Do(new RemoveStroke("Me", _strokes[^1].Id));
         }
 
         public void Clear() => Do(new ClearAll());
