@@ -1,4 +1,5 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿using Avalonia.Media;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RemotePainting.Models;
 using RemotePainting.Networking;
@@ -10,6 +11,12 @@ namespace RemotePainting.ViewModels.Menus
     {
         private readonly MainRootViewModel _navigation;
         private readonly PaintingAppModel _paintingAppModel;
+
+        [ObservableProperty]
+        private Color _selectedColor = Colors.Black;
+
+        [ObservableProperty]
+        private double _thickness = 3;
 
         public CanvasVM(MainRootViewModel navigation, PaintingAppModel paintingAppModel)
         {
