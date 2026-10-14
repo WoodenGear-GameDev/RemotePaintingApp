@@ -39,6 +39,7 @@
               Background="#ca80de"/>
       <Button Content="Отменить" Click="Undo_Click"/>
       <Button Content="Очистить" Click="Clear_Click"/>
+      <Button Content="Сохранить" Click="SavePng_Click"/>
     </StackPanel>
 
   </Grid>

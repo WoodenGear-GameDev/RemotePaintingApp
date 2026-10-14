@@ -2,6 +2,8 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using System.IO;
+using Avalonia.Media.Imaging;
 using System;
 using System.Collections.Generic;
 
@@ -31,6 +33,7 @@ namespace RemotePainting.Controls
         private readonly Dictionary<(string Author, int Id), Stroke> _byId = new();
         private int _currentId = -1;   
         private int _nextId;
+        private bool _forExport;
 
         private const double MinDistancePx = 1.5;
 
@@ -118,7 +121,7 @@ namespace RemotePainting.Controls
 
         public override void Render(DrawingContext ctx)
         {
-            ctx.FillRectangle(Brushes.Transparent, new Rect(Bounds.Size));
+            ctx.FillRectangle(_forExport ? Brushes.White : Brushes.Transparent, new Rect(Bounds.Size));
 
             foreach (var s in _strokes)
             {
@@ -136,6 +139,15 @@ namespace RemotePainting.Controls
                 for (int i = 1; i < s.Points.Count; i++)
                     ctx.DrawLine(pen, ToPx(s.Points[i - 1]), ToPx(s.Points[i]));
             }
+        }
+        public void SaveToPng(Stream stream)
+        {
+            var size = new PixelSize((int)Bounds.Width, (int)Bounds.Height);
+            using var bmp = new RenderTargetBitmap(size, new Vector(96, 96));
+            _forExport = true;
+            try { bmp.Render(this); }
+            finally { _forExport = false; }
+            bmp.Save(stream);
         }
 
         private Point ToPx(Point p) => new(p.X * Bounds.Width, p.Y * Bounds.Height);
