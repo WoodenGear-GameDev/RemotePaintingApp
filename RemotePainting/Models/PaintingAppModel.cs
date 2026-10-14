@@ -31,19 +31,19 @@ namespace RemotePainting.Models
             switch (dCmd)
             {
                 case BeginStroke b:
-                    data = string.Create(IC, $"DRAW:BEGIN_STROKE:{b.Author}|{b.Id}|{b.Color}|{b.Thickness}|{b.X}|{b.Y}");
+                    data = string.Create(IC, $"DRAW:BEGIN_STROKE:{b.Id}|{b.Color}|{b.Thickness}|{b.X}|{b.Y}");
                     break;
  
                 case AddPoint a:
-                    data = string.Create(IC, $"DRAW:ADD_POINT:{a.Author}|{a.Id}|{a.X}|{a.Y}");
+                    data = string.Create(IC, $"DRAW:ADD_POINT:{a.Id}|{a.X}|{a.Y}");
                     break;
  
                 case RemoveStroke r:
-                    data = string.Create(IC, $"DRAW:REMOVE_STROKE:{r.Author}|{r.Id}");
+                    data = string.Create(IC, $"DRAW:REMOVE_STROKE:{r.Id}");
                     break;
  
                 case ClearAll:
-                    data = "DRAW:CLEAR_ALL";
+                    data = "DRAW:CLEAR_ALL:";
                     break;
  
                 default:
@@ -51,7 +51,6 @@ namespace RemotePainting.Models
             }
  
             _networkService?.SendData(data);
-            System.Diagnostics.Debug.WriteLine($"SEND:  {data}");
         }
 
         public void ReceiveData(string data)
@@ -60,13 +59,6 @@ namespace RemotePainting.Models
                 return;
 
             string payload = data.Substring("DRAW:".Length);
-
-            if (payload == "CLEAR_ALL")
-            {
-                ApplyDoOnBoard(new ClearAll());
-                System.Diagnostics.Debug.WriteLine($"CLEAR_ALL");
-                return;
-            }
 
             string[] commandParts = payload.Split(':', 2);
             if (commandParts.Length < 2)
@@ -80,49 +72,49 @@ namespace RemotePainting.Models
                 case "BEGIN_STROKE":
                     if (args.Length == 6)
                     {
-                        string author = args[0];
-                        int id = int.Parse(args[1]);
-                        uint color = uint.Parse(args[2]);
-                        float thickness = float.Parse(args[3], CultureInfo.InvariantCulture);
-                        float x = float.Parse(args[4], CultureInfo.InvariantCulture);
-                        float y = float.Parse(args[5], CultureInfo.InvariantCulture);
+                        string author = args[5];
+                        int id = int.Parse(args[0]);
+                        uint color = uint.Parse(args[1]);
+                        float thickness = float.Parse(args[2], CultureInfo.InvariantCulture);
+                        float x = float.Parse(args[3], CultureInfo.InvariantCulture);
+                        float y = float.Parse(args[4], CultureInfo.InvariantCulture);
 
                         ApplyDoOnBoard(new BeginStroke(author, id, color, thickness, x, y));
-                        System.Diagnostics.Debug.WriteLine($"{author}: BEGIN_STROKE");
-                        return;
                     }
                     break;
 
                 case "ADD_POINT":
                     if (args.Length == 4)
                     {
-                        string author = args[0];
-                        int id = int.Parse(args[1]);
-                        float x = float.Parse(args[2], CultureInfo.InvariantCulture);
-                        float y = float.Parse(args[3], CultureInfo.InvariantCulture);
+                        string author = args[3];
+                        int id = int.Parse(args[0]);
+                        float x = float.Parse(args[1], CultureInfo.InvariantCulture);
+                        float y = float.Parse(args[2], CultureInfo.InvariantCulture);
 
                         ApplyDoOnBoard(new AddPoint(author, id, x, y));
-                        System.Diagnostics.Debug.WriteLine($"{author}: ADD_POINT");
-                        return;
                     }
                     break;
 
                 case "REMOVE_STROKE":
                     if (args.Length == 2)
                     {
-                        string author = args[0];
-                        int id = int.Parse(args[1]);
+                        string author = args[1];
+                        int id = int.Parse(args[0]);
 
                         ApplyDoOnBoard(new RemoveStroke(author, id));
-                        System.Diagnostics.Debug.WriteLine($"{author}: REMOVE_STROKE");
                     }
                     break;
+                case "CLEAR_ALL":
+                    ApplyDoOnBoard(new ClearAll());
+                    break;
+
+                default:
+                    return;
             }
         }
 
         public void ApplyDoOnBoard(DrawCommand dCmd)
         {
-            System.Diagnostics.Debug.WriteLine($"Отправка на доску");
             _drawingBoard?.Apply(dCmd);
         }
 

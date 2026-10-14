@@ -114,7 +114,17 @@ namespace RemotePainting.Controls
         public void Undo()
         {
             if (_strokes.Count > 0)
-                Do(new RemoveStroke("Me", _strokes[^1].Id));
+            {
+                for (int i = _strokes.Count - 1; i >= 0; i--)
+                {
+                    var s = _strokes[i];
+                    if (s.Author == "Me")
+                    {
+                        Do(new RemoveStroke("Me", s.Id));
+                        break;
+                    }
+                }
+            }
         }
 
         public void Clear() => Do(new ClearAll());

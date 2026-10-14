@@ -107,6 +107,7 @@ namespace RemotePainting.Networking
         private async Task ConnectToServer()
         {
             _cts = new CancellationTokenSource();
+            await Task.Delay(500, _cts.Token);
 
             try
             {
@@ -180,7 +181,6 @@ namespace RemotePainting.Networking
             }
             catch (OperationCanceledException)
             {
-                // Сработал таймаут или глобальная отмена
                 HandleDisconnection();
             }
             catch (Exception)
@@ -198,31 +198,38 @@ namespace RemotePainting.Networking
 
         private async Task StartListeningServer(Stream stream, CancellationToken cancellationToken)
         {
-            System.Diagnostics.Debug.WriteLine($"StartListening");
-            try
+            using (stream)
+            using (var reader = new StreamReader(stream, Encoding.UTF8))
             {
-                while (!cancellationToken.IsCancellationRequested)
+                try
                 {
-                    byte[] buffer = new byte[256];
-                    int byteAmount = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken);
-                    if (byteAmount == 0)
+                    while (!cancellationToken.IsCancellationRequested)
                     {
-                        Disconnected?.Invoke();
-                        break;
+
+                        string? data = await reader.ReadLineAsync();
+
+                        if (string.IsNullOrEmpty(data))
+                        {
+                            Disconnected?.Invoke();
+                            break;
+                        }
+
+                        OnDataReceived?.Invoke(data);
                     }
-                    string data = Encoding.UTF8.GetString(buffer, 0, byteAmount);
-                    OnDataReceived?.Invoke(data);
                 }
-            }
-            catch (Exception)
-            {
-                Disconnected?.Invoke();
+                catch (Exception)
+                {
+                }
+                finally
+                {
+                    Disconnected?.Invoke();
+                }
             }
         }
 
         public async Task SendData(string message)
         {
-            byte[] messageBytes = Encoding.UTF8.GetBytes(message);
+            byte[] messageBytes = Encoding.UTF8.GetBytes($"{message}\n");
 
             await _stream!.WriteAsync(messageBytes, 0, messageBytes.Length, _cts!.Token);
         }
@@ -244,10 +251,12 @@ namespace RemotePainting.Networking
         public event Action<string>? OnDataReceived;
         public event Action? Disconnected;
         private readonly int _port;
+        private const int MaxClients = 3;
         public bool IsRunning { get; private set; }
         private TcpListener? _tcpListener;
         private List<ClientInfo> _currentClients = new();
         private CancellationTokenSource? _cts;
+        private readonly string _hostName = Dns.GetHostName();
 
         public Server(int port)
         {
@@ -267,10 +276,9 @@ namespace RemotePainting.Networking
 
         private string GetServerInfo()
         {
-            string hostName = Dns.GetHostName();
             try
             {
-                var hostEntry = Dns.GetHostEntry(hostName);
+                var hostEntry = Dns.GetHostEntry(_hostName);
 
                 foreach (var ip in hostEntry.AddressList)
                 {
@@ -278,7 +286,7 @@ namespace RemotePainting.Networking
                     {
                         if (ip.ToString().StartsWith("192.168.") || ip.ToString().StartsWith("10."))
                         {
-                            return $"SERVER:{hostName}|{ip}";
+                            return $"SERVER:{_hostName}|{ip}";
                         }
                     }
                 }
@@ -288,7 +296,7 @@ namespace RemotePainting.Networking
 
             }
 
-            return $"SERVER:{hostName}|127.0.0.1";
+            return $"SERVER:{_hostName}|127.0.0.1";
         }
 
         public void Start()
@@ -372,7 +380,15 @@ namespace RemotePainting.Networking
                 try
                 {
                     TcpClient client = await _tcpListener!.AcceptTcpClientAsync(cancellationToken);
-                    _ = RegisterClient(client, cancellationToken);
+                    if (_currentClients.Count >= MaxClients)
+                    {
+                        client.Close();
+                    }
+                    else
+                    {
+                        _ = RegisterClient(client, cancellationToken);
+                    }
+
                 }
                 catch (OperationCanceledException)
                 {
@@ -392,7 +408,16 @@ namespace RemotePainting.Networking
         {
             try
             {
-                byte[] messageBytes = Encoding.UTF8.GetBytes("GET_NAME");
+                byte[] messageBytes;
+                if (_currentClients.Count >= MaxClients)
+                {
+                    messageBytes = Encoding.UTF8.GetBytes("FULL");
+                    await client.GetStream().WriteAsync(messageBytes, 0, messageBytes.Length, cancellationToken);
+                    client.Close();
+                    return;
+                }
+
+                messageBytes = Encoding.UTF8.GetBytes("GET_NAME");
                 await client.GetStream().WriteAsync(messageBytes, 0, messageBytes.Length, cancellationToken);
 
                 using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
@@ -411,13 +436,21 @@ namespace RemotePainting.Networking
                 if (response.StartsWith("CLIENT:"))
                 {
                     string payload = response.Substring("CLIENT:".Length);
-                    ClientInfo clientInfo = new ClientInfo(payload, client);
+                    string name = GetUnicClientName(payload);
+                    ClientInfo clientInfo = new ClientInfo(name, client);
+
+                    if (_currentClients.Count >= MaxClients)
+                    {
+                        client.Close();
+                        return;
+                    }
+
                     _currentClients.Add(clientInfo);
 
                     messageBytes = Encoding.UTF8.GetBytes("WELCOME");
                     await client.GetStream().WriteAsync(messageBytes, 0, messageBytes.Length, cancellationToken);
 
-                    System.Diagnostics.Debug.WriteLine($"Подключился: {payload}");
+                    System.Diagnostics.Debug.WriteLine($"Подключился: {name}");
                     _ = StartListeningClientSignals(clientInfo, cancellationToken);
                 }
                 else
@@ -431,27 +464,40 @@ namespace RemotePainting.Networking
             }
         }
 
+        private string GetUnicClientName(string name)
+        {
+            int suffix = 2;
+            string uniqueName = name;
+            while (_currentClients.Any(c => c.Name == uniqueName) || uniqueName == _hostName)
+            {
+                uniqueName = $"{name}_{suffix}";
+                suffix++;
+            }
+            return uniqueName;
+        }
+
         private async Task StartListeningClientSignals(ClientInfo clientInfo, CancellationToken cancellationToken)
         {
             using (clientInfo.Client)
             using (var stream = clientInfo.Client.GetStream())
+            using (var reader = new StreamReader(stream, Encoding.UTF8))
             {
-                byte[] buffer = new byte[1024];
-
                 try
                 {
                     while (!cancellationToken.IsCancellationRequested)
                     {
-                        int byteAmount = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken);
 
-                        if (byteAmount == 0)
+                        string? data = await reader.ReadLineAsync();
+
+                        if (string.IsNullOrEmpty(data))
                         {
+                            clientInfo.Client.Close();
+                            _currentClients.Remove(clientInfo);
                             break;
                         }
 
-                        string message = Encoding.UTF8.GetString(buffer, 0, byteAmount);
-                        OnDataReceived?.Invoke(message);
-                        _ = RetransmitData(message, clientInfo.Name);
+                        OnDataReceived?.Invoke($"{data}|{clientInfo.Name}");
+                        _ = RetransmitData(data, clientInfo.Name);
                     }
                 }
                 catch (Exception)
@@ -459,6 +505,7 @@ namespace RemotePainting.Networking
                 }
                 finally
                 {
+                    clientInfo.Client.Close();
                     _currentClients.Remove(clientInfo);
                 }
             }
@@ -466,7 +513,7 @@ namespace RemotePainting.Networking
 
         public async Task SendData(string strokeData)
         {
-            byte[] messageBytes = Encoding.UTF8.GetBytes(strokeData);
+            byte[] messageBytes = Encoding.UTF8.GetBytes($"{strokeData}|{_hostName}\n");
             var disconnectedClients = new List<ClientInfo>();
 
             foreach (var clientInfo in _currentClients)
@@ -490,7 +537,7 @@ namespace RemotePainting.Networking
 
         private async Task RetransmitData(string data, string sourceName)
         {
-            byte[] messageBytes = Encoding.UTF8.GetBytes(data);
+            byte[] messageBytes = Encoding.UTF8.GetBytes($"{data}|{sourceName}\n");
             var disconnectedClients = new List<ClientInfo>();
             foreach (var clientInfo in _currentClients)
             {
