@@ -1,22 +1,42 @@
 ﻿<Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:RemotePainting.ViewModels"
+        xmlns:v="using:RemotePainting.Views"
+
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="600"
+
         x:Class="RemotePainting.Views.MainWindow"
-        x:DataType="vm:MainViewModel"
-        Icon="/Assets/avalonia-logo.ico"
-        Title="RemotePainting">
+        x:DataType="vm:MainRootViewModel"
 
-    <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
-        <vm:MainViewModel />
-    </Design.DataContext>
+        Width="600"
+        Height="600"
+        CanResize="False"
 
-    <TextBox Text="{Binding Greeting}"
-             HorizontalAlignment="Center"
-             VerticalAlignment="Center" />
+        Icon="/Assets/AppIcon.png"
+        Title="Remote Painting">
 
+    <Border Background="#242224">
+        <ContentControl Content="{Binding CurrentViewModel}">
+            <ContentControl.DataTemplates>
+      
+              <!-- 1. Если активен MainMenuViewModel, показываем MainMenuView -->
+              <DataTemplate DataType="vm:Menus.MainMenuVM">
+                <v:MainMenuView />
+              </DataTemplate>
+
+              <!-- 2. Если активен ServerListViewModel, показываем ServerListView -->
+              <DataTemplate DataType="vm:Menus.ServerListVM">
+                <v:ServerListView />
+              </DataTemplate>
+
+              <!-- 3. Если активен CanvasViewModel, показываем CanvasView -->
+              <DataTemplate DataType="vm:Menus.CanvasVM">
+                <v:CanvasView />
+              </DataTemplate>
+
+            </ContentControl.DataTemplates>
+          </ContentControl>
+    </Border>
 </Window>
