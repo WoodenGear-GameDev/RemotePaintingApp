@@ -10,12 +10,63 @@
         x:Class="RemotePainting.Views.MainWindow"
         x:DataType="vm:MainRootViewModel"
 
-        Width="600"
-        Height="600"
+        Width="1200"
+        Height="800"
         CanResize="False"
 
         Icon="/Assets/AppIcon.png"
         Title="Remote Painting">
+
+    <Window.Styles>
+        <Style Selector="Button.image-only-button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+
+        <Style Selector="Button.image-only-button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+
+        <Style Selector="Button.image-only-button:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+
+        <Style Selector="TextBox.chat-box">
+            <Setter Property="Background" Value="#161416"/>
+            <Setter Property="BorderBrush" Value="#ca80de"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="CaretBrush" Value="Transparent"/>
+        </Style>
+
+        <Style Selector="TextBox.chat-box:pointerover /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="#161416"/>
+            <Setter Property="BorderBrush" Value="#ca80de"/>
+        </Style>
+
+        <Style Selector="TextBox.chat-box:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="#161416"/>
+            <Setter Property="BorderBrush" Value="#ca80de"/>
+        </Style>
+
+        <Style Selector="TextBox.message-box">
+            <Setter Property="Background" Value="#161416"/>
+            <Setter Property="BorderBrush" Value="#ca80de"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+
+        <Style Selector="TextBox.message-box:pointerover /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="#161416"/>
+            <Setter Property="BorderBrush" Value="White"/>
+        </Style>
+
+        <Style Selector="TextBox.message-box:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="#161416"/>
+            <Setter Property="BorderBrush" Value="#ca80de"/>
+        </Style>
+    </Window.Styles>
 
     <Border Background="#242224">
         <ContentControl Content="{Binding CurrentViewModel}">
