@@ -3,10 +3,10 @@ using RemotePainting.Networking;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Tmds.DBus.Protocol;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace RemotePainting.Models
 {
@@ -26,6 +26,35 @@ namespace RemotePainting.Models
             _drawingBoard.CommandProduced += SendDrawingData;
         }
 
+        public void LoadServerBoard(ClientInfo clientInfo)
+        {
+            var commands = _drawingBoard!.GetAllStrokeCommands();
+
+            List<(string, string)> dataList = new();
+            foreach (var dCmd in commands)
+            {
+                string userName = string.Empty;
+                string data = string.Empty;
+                switch (dCmd)
+                {
+                    case BeginStroke b:
+                        data = string.Create(IC, $"DRAW:BEGIN_STROKE:{b.Id}|{b.Color}|{b.Thickness}|{b.X}|{b.Y}");
+                        userName = b.Author;
+                        break;
+                    case AddPoint a:
+                        data = string.Create(IC, $"DRAW:ADD_POINT:{a.Id}|{a.X}|{a.Y}");
+                        userName = a.Author;
+                        break;
+                }
+                if (!string.IsNullOrEmpty(userName) && !string.IsNullOrEmpty(data))
+                {
+                    dataList.Add((userName, data));
+                }
+            }
+
+            _ = _networkService!.SyncClientBoard(clientInfo, dataList);
+        }
+
         public void SendDrawingData(DrawCommand dCmd)
         {
             string data;
@@ -34,23 +63,23 @@ namespace RemotePainting.Models
                 case BeginStroke b:
                     data = string.Create(IC, $"DRAW:BEGIN_STROKE:{b.Id}|{b.Color}|{b.Thickness}|{b.X}|{b.Y}");
                     break;
- 
+
                 case AddPoint a:
                     data = string.Create(IC, $"DRAW:ADD_POINT:{a.Id}|{a.X}|{a.Y}");
                     break;
- 
+
                 case RemoveStroke r:
                     data = string.Create(IC, $"DRAW:REMOVE_STROKE:{r.Id}");
                     break;
- 
+
                 case ClearAll:
                     data = "DRAW:CLEAR_ALL:";
                     break;
- 
+
                 default:
                     return;
             }
- 
+
             _networkService?.SendData(data);
         }
 
@@ -61,11 +90,11 @@ namespace RemotePainting.Models
 
         public void ReceiveMessage(string message)
         {
-            if(message.StartsWith("Message:"))
+            if (message.StartsWith("Message:"))
             {
                 ShowMessage(message.Substring("Message:".Length));
             }
-            else if(message.StartsWith("DRAW:"))
+            else if (message.StartsWith("DRAW:"))
             {
                 ReceiveData(message.Substring("DRAW:".Length));
             }
@@ -144,6 +173,7 @@ namespace RemotePainting.Models
         {
             _networkService = new Networking.Server(_port);
             _networkService.OnDataReceived += ReceiveMessage;
+            _networkService.Connected += LoadServerBoard;
             _networkService.Start();
         }
 

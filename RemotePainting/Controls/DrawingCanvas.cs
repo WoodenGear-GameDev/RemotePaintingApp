@@ -6,6 +6,7 @@ using System.IO;
 using Avalonia.Media.Imaging;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace RemotePainting.Controls
 {
@@ -31,7 +32,7 @@ namespace RemotePainting.Controls
 
         private readonly List<Stroke> _strokes = new();
         private readonly Dictionary<(string Author, int Id), Stroke> _byId = new();
-        private int _currentId = -1;   
+        private int _currentId = -1;
         private int _nextId;
         private bool _forExport;
 
@@ -74,6 +75,20 @@ namespace RemotePainting.Controls
             CommandProduced?.Invoke(cmd);
         }
 
+        public List<DrawCommand> GetAllStrokeCommands()
+        {
+            List<DrawCommand> strokes = new List<DrawCommand>();
+            foreach (var stroke in _strokes)
+            {
+                strokes.Add(new BeginStroke(stroke.Author, stroke.Id, stroke.ColorArgb, stroke.Thickness,
+                                      (float)stroke.Points[0].X, (float)stroke.Points[0].Y));
+
+                foreach (var point in (stroke.Points).Skip(1))
+                    strokes.Add(new AddPoint(stroke.Author, stroke.Id, (float)point.X, (float)point.Y));
+            }
+            return strokes;
+        }
+
         private Point Norm(Point p) => new(p.X / Bounds.Width, p.Y / Bounds.Height);
 
         protected override void OnPointerPressed(PointerPressedEventArgs e)
@@ -85,7 +100,7 @@ namespace RemotePainting.Controls
             _currentId = _nextId++;
             Do(new BeginStroke("Me", _currentId, BrushColor.ToUInt32(), (float)BrushThickness,
                                (float)p.X, (float)p.Y));
-            e.Pointer.Capture(this); 
+            e.Pointer.Capture(this);
         }
 
         protected override void OnPointerMoved(PointerEventArgs e)

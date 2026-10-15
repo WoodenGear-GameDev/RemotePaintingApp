@@ -1,6 +1,4 @@
-﻿using HarfBuzzSharp;
-using SkiaSharp;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -9,7 +7,6 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace RemotePainting.Networking
 {
@@ -71,15 +68,18 @@ namespace RemotePainting.Networking
     {
         event Action<string> OnDataReceived;
         event Action Disconnected;
+        event Action<ClientInfo> Connected;
 
         void Start();
         void Stop();
         Task SendData(string data);
+        Task SyncClientBoard(ClientInfo clientInfo, List<(string, string)> dataList);
     }
 
     internal class Client : INetworkService
     {
         public event Action<string>? OnDataReceived;
+        public event Action<ClientInfo>? Connected;
         public event Action? Disconnected;
         private readonly string _serverIp = string.Empty;
         private readonly int _port;
@@ -91,6 +91,11 @@ namespace RemotePainting.Networking
         {
             _serverIp = serverIp;
             _port = port;
+        }
+
+        public async Task SyncClientBoard(ClientInfo clientInfo, List<(string, string)> data)
+        {
+            Stop();
         }
 
         public void Start()
@@ -236,6 +241,17 @@ namespace RemotePainting.Networking
         }
     }
 
+    public class ClientInfo
+    {
+        public string Name { get; private set; }
+        public TcpClient Client { get; private set; }
+        public ClientInfo(string name, TcpClient client)
+        {
+            Name = name;
+            Client = client;
+        }
+    }
+
     public class ServerInfo
     {
         public string HostName { get; private set; }
@@ -250,6 +266,7 @@ namespace RemotePainting.Networking
     internal class Server : INetworkService
     {
         public event Action<string>? OnDataReceived;
+        public event Action<ClientInfo>? Connected;
         public event Action? Disconnected;
         private readonly int _port;
         private const int MaxClients = 3;
@@ -262,17 +279,6 @@ namespace RemotePainting.Networking
         public Server(int port)
         {
             _port = port;
-        }
-
-        private class ClientInfo
-        {
-            public string Name { get; private set; }
-            public TcpClient Client { get; private set; }
-            public ClientInfo(string name, TcpClient client)
-            {
-                Name = name;
-                Client = client;
-            }
         }
 
         private string GetServerInfo()
@@ -452,6 +458,8 @@ namespace RemotePainting.Networking
                     await client.GetStream().WriteAsync(messageBytes, 0, messageBytes.Length, cancellationToken);
 
                     OnDataReceived?.Invoke($"Message:{name}|I'm your new friend!");
+                    Connected?.Invoke(clientInfo);
+
                     _ = StartListeningClientSignals(clientInfo, cancellationToken);
                 }
                 else
@@ -462,6 +470,28 @@ namespace RemotePainting.Networking
             catch (Exception)
             {
                 client.Close();
+            }
+        }
+
+        public async Task SyncClientBoard(ClientInfo clientInfo, List<(string, string)> dataList)
+        {
+            try
+            {
+                byte[] messageBytes;
+                foreach (var (userName, data) in dataList)
+                {
+                    if (data.StartsWith("DRAW:"))
+                    {
+                        string name = userName == "Me" ? "(Server)" + _hostName : userName;
+                        messageBytes = Encoding.UTF8.GetBytes($"{data}|{name}\n");
+                        await clientInfo.Client.GetStream().WriteAsync(messageBytes, 0, messageBytes.Length);
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                clientInfo.Client.Close();
+                _currentClients.Remove(clientInfo);
             }
         }
 
@@ -497,7 +527,7 @@ namespace RemotePainting.Networking
                             break;
                         }
 
-                        if(data.StartsWith("DRAW:"))
+                        if (data.StartsWith("DRAW:"))
                         {
                             OnDataReceived?.Invoke($"{data}|{clientInfo.Name}");
                         }
@@ -505,7 +535,7 @@ namespace RemotePainting.Networking
                         {
                             OnDataReceived?.Invoke($"Message:{clientInfo.Name}|{data}");
                         }
-                        
+
                         _ = RetransmitData(data, clientInfo.Name);
                     }
                 }
