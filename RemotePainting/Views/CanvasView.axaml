@@ -37,7 +37,7 @@
               Command="{Binding CloseCanvasCommand}"
               Foreground="White"
               Background="#ca80de"/>
-      <Button Content="Undo" Click="Undo_Click"/>
+      <Button Content="Undo" Click="Undo_Click" HotKey="Ctrl+z"/>
       <Button Content="Clear" Click="Clear_Click"/>
       <Button Content="Save" Click="SavePng_Click"/>
     </StackPanel>
@@ -45,6 +45,7 @@
       <Grid RowDefinitions="*, Auto" Grid.Row="1" Grid.Column="1" Margin="15, 15, 0, 0">
           <TextBox Grid.Row="0"
                    Classes="chat-box"
+                   Text="{Binding ChatHistory}"
                    BorderThickness="2"
                    VerticalAlignment="Stretch"
                    Width="250"
@@ -57,9 +58,10 @@
             <Grid Grid.Row="1" Margin="0, 5, 0, 15">
     
             <TextBox Classes="message-box"
+                     Text="{Binding UserInput}"
                      BorderThickness="2"
                      Height="30"
-                     HorizontalAlignment="Stretch"
+                     Width="250"
                      AcceptsReturn="True" 
                      TextWrapping="Wrap"
                      FontSize="12"
@@ -67,6 +69,8 @@
                      Padding="5, 5, 20, 5"/>
 
             <Button Classes="image-only-button"
+                    Command="{Binding SendUserMessageCommand}"
+                    HotKey="Enter"
                     Width="24"
                     Height="24"
                     VerticalAlignment="Center"

@@ -9,6 +9,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace RemotePainting.Networking
 {
@@ -80,7 +81,7 @@ namespace RemotePainting.Networking
     {
         public event Action<string>? OnDataReceived;
         public event Action? Disconnected;
-        private readonly string _serverIp = String.Empty;
+        private readonly string _serverIp = string.Empty;
         private readonly int _port;
         private TcpClient? _tcpClient;
         private Stream? _stream;
@@ -450,7 +451,7 @@ namespace RemotePainting.Networking
                     messageBytes = Encoding.UTF8.GetBytes("WELCOME");
                     await client.GetStream().WriteAsync(messageBytes, 0, messageBytes.Length, cancellationToken);
 
-                    System.Diagnostics.Debug.WriteLine($"Подключился: {name}");
+                    OnDataReceived?.Invoke($"Message:{name}|I'm your new friend!");
                     _ = StartListeningClientSignals(clientInfo, cancellationToken);
                 }
                 else
@@ -496,7 +497,15 @@ namespace RemotePainting.Networking
                             break;
                         }
 
-                        OnDataReceived?.Invoke($"{data}|{clientInfo.Name}");
+                        if(data.StartsWith("DRAW:"))
+                        {
+                            OnDataReceived?.Invoke($"{data}|{clientInfo.Name}");
+                        }
+                        else
+                        {
+                            OnDataReceived?.Invoke($"Message:{clientInfo.Name}|{data}");
+                        }
+                        
                         _ = RetransmitData(data, clientInfo.Name);
                     }
                 }
@@ -511,9 +520,18 @@ namespace RemotePainting.Networking
             }
         }
 
-        public async Task SendData(string strokeData)
+        public async Task SendData(string data)
         {
-            byte[] messageBytes = Encoding.UTF8.GetBytes($"{strokeData}|{_hostName}\n");
+            byte[] messageBytes;
+            if (data.StartsWith("DRAW:"))
+            {
+                messageBytes = Encoding.UTF8.GetBytes($"{data}|(Server){_hostName}\n");
+            }
+            else
+            {
+                messageBytes = Encoding.UTF8.GetBytes($"Message:(Server){_hostName}|{data}\n");
+            }
+
             var disconnectedClients = new List<ClientInfo>();
 
             foreach (var clientInfo in _currentClients)
@@ -537,7 +555,16 @@ namespace RemotePainting.Networking
 
         private async Task RetransmitData(string data, string sourceName)
         {
-            byte[] messageBytes = Encoding.UTF8.GetBytes($"{data}|{sourceName}\n");
+            byte[] messageBytes;
+            if (data.StartsWith("DRAW:"))
+            {
+                messageBytes = Encoding.UTF8.GetBytes($"{data}|{sourceName}\n");
+            }
+            else
+            {
+                messageBytes = Encoding.UTF8.GetBytes($"Message:{sourceName}|{data}\n");
+            }
+
             var disconnectedClients = new List<ClientInfo>();
             foreach (var clientInfo in _currentClients)
             {

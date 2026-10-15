@@ -6,14 +6,15 @@ using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using Tmds.DBus.Protocol;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace RemotePainting.Models
 {
     internal class PaintingAppModel
     {
-         private static readonly CultureInfo IC = CultureInfo.InvariantCulture;
-        public event Action<string>? OnErrorOccurred;
+        private static readonly CultureInfo IC = CultureInfo.InvariantCulture;
         public event Action<string>? OnDrawDataReceived;
+        public event Action<string, string>? OnMessageReceived;
         private INetworkService? _networkService;
         public List<ServerInfo> Servers { get; private set; } = new();
         private int _port = 7777;
@@ -53,14 +54,35 @@ namespace RemotePainting.Models
             _networkService?.SendData(data);
         }
 
+        public void SendUserMessage(string message)
+        {
+            _networkService?.SendData(message);
+        }
+
+        public void ReceiveMessage(string message)
+        {
+            if(message.StartsWith("Message:"))
+            {
+                ShowMessage(message.Substring("Message:".Length));
+            }
+            else if(message.StartsWith("DRAW:"))
+            {
+                ReceiveData(message.Substring("DRAW:".Length));
+            }
+        }
+
+        public void ShowMessage(string message)
+        {
+            string[] args = message.Split('|', 2);
+            string userName = args[0];
+            string userMessage = message.Substring($"{userName}|".Length);
+
+            OnMessageReceived?.Invoke(userName, userMessage);
+        }
+
         public void ReceiveData(string data)
         {
-            if (!data.StartsWith("DRAW:"))
-                return;
-
-            string payload = data.Substring("DRAW:".Length);
-
-            string[] commandParts = payload.Split(':', 2);
+            string[] commandParts = data.Split(':', 2);
             if (commandParts.Length < 2)
                 return;
 
@@ -121,14 +143,14 @@ namespace RemotePainting.Models
         public void CreateNewCanvas()
         {
             _networkService = new Networking.Server(_port);
-            _networkService.OnDataReceived += ReceiveData;
+            _networkService.OnDataReceived += ReceiveMessage;
             _networkService.Start();
         }
 
         public void ConnectToCanvas(string ipAddress)
         {
             _networkService = new Networking.Client(ipAddress, _port);
-            _networkService.OnDataReceived += ReceiveData;
+            _networkService.OnDataReceived += ReceiveMessage;
             _networkService.Start();
         }
 

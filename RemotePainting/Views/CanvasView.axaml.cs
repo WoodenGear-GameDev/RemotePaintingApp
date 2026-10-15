@@ -40,7 +40,7 @@ public partial class CanvasView : UserControl
 
         var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Сохранить рисунок",
+            Title = "Save image",
             SuggestedFileName = "drawing.png",
             DefaultExtension = "png",
             FileTypeChoices = new[] { FilePickerFileTypes.ImagePng }
