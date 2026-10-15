@@ -86,6 +86,9 @@
               <DataTemplate DataType="vm:Menus.CanvasVM">
                 <v:CanvasView />
               </DataTemplate>
+                <DataTemplate DataType="vm:Menus.UsernameVM">
+                    <v:UsernameView />
+                </DataTemplate>
 
             </ContentControl.DataTemplates>
           </ContentControl>

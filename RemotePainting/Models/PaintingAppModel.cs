@@ -75,6 +75,13 @@ namespace RemotePainting.Models
                 case ClearAll:
                     data = "DRAW:CLEAR_ALL:";
                     break;
+                case CursorMove c:
+                    data = string.Create(IC, $"DRAW:CURSOR:{c.X}|{c.Y}|{UserName}");
+                    break;
+
+                case CursorHide:
+                    data = $"DRAW:CURSOR_HIDE:{UserName}";
+                    break;
 
                 default:
                     return;
@@ -158,6 +165,19 @@ namespace RemotePainting.Models
                 case "CLEAR_ALL":
                     ApplyDoOnBoard(new ClearAll());
                     break;
+                case "CURSOR":
+                    if (args.Length >= 3)
+                    {
+                        float cx = float.Parse(args[0], CultureInfo.InvariantCulture);
+                        float cy = float.Parse(args[1], CultureInfo.InvariantCulture);
+                        ApplyDoOnBoard(new CursorMove(args[2], cx, cy));
+                    }
+                    break;
+
+                case "CURSOR_HIDE":
+                    if (args.Length >= 1 && args[0].Length > 0)
+                        ApplyDoOnBoard(new CursorHide(args[0]));
+                    break;
 
                 default:
                     return;
@@ -171,7 +191,7 @@ namespace RemotePainting.Models
 
         public void CreateNewCanvas()
         {
-            _networkService = new Networking.Server(_port);
+            _networkService = new Networking.Server(_port, UserName);
             _networkService.OnDataReceived += ReceiveMessage;
             _networkService.Connected += LoadServerBoard;
             _networkService.Start();
@@ -179,7 +199,7 @@ namespace RemotePainting.Models
 
         public void ConnectToCanvas(string ipAddress)
         {
-            _networkService = new Networking.Client(ipAddress, _port);
+            _networkService = new Networking.Client(ipAddress, _port, UserName);
             _networkService.OnDataReceived += ReceiveMessage;
             _networkService.Start();
         }
@@ -202,5 +222,19 @@ namespace RemotePainting.Models
                 _networkService.Disconnected += onDisconnected;
             }
         }
+        private string _userName = "Anonymous";
+        public string UserName
+        {
+            get => _userName;
+            set => _userName = Sanitize(value);
+        }
+
+        private static string Sanitize(string? name)
+        {
+            var clean = new string((name ?? "").Where(c => c != '|' && c != ':' && !char.IsControl(c)).ToArray()).Trim();
+            if (clean.Length > 20) clean = clean.Substring(0, 20);
+            return clean.Length == 0 ? "Anonymous" : clean;
+        }
+
     }
 }
