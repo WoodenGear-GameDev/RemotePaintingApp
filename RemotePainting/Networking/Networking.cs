@@ -86,11 +86,15 @@ namespace RemotePainting.Networking
         private TcpClient? _tcpClient;
         private Stream? _stream;
         private CancellationTokenSource? _cts;
+        private readonly string _userName;
 
-        public Client(string serverIp, int port)
+
+        public Client(string serverIp, int port, string userName)
         {
             _serverIp = serverIp;
             _port = port;
+            _userName = userName;
+
         }
 
         public async Task SyncClientBoard(ClientInfo clientInfo, List<(string, string)> data)
@@ -153,8 +157,7 @@ namespace RemotePainting.Networking
 
                 if (request == "GET_NAME")
                 {
-                    string hostName = Dns.GetHostName();
-                    string message = $"CLIENT:{hostName}";
+                    string message = $"CLIENT:{_userName}";
                     byte[] messageBytes = Encoding.UTF8.GetBytes(message);
 
                     await stream.WriteAsync(messageBytes, 0, messageBytes.Length, cancellationToken);
@@ -275,12 +278,13 @@ namespace RemotePainting.Networking
         private List<ClientInfo> _currentClients = new();
         private CancellationTokenSource? _cts;
         private readonly string _hostName = Dns.GetHostName();
+        private readonly string _userName;
 
-        public Server(int port)
+        public Server(int port, string userName)
         {
             _port = port;
+            _userName = userName;
         }
-
         private string GetServerInfo()
         {
             try
@@ -493,7 +497,7 @@ namespace RemotePainting.Networking
                 {
                     if (data.StartsWith("DRAW:"))
                     {
-                        string name = userName == "Me" ? "(Server)" + _hostName : userName;
+                        string name = userName == "Me" ? _userName : userName;
                         messageBytes = Encoding.UTF8.GetBytes($"{data}|{name}\n");
                         await clientInfo.Client.GetStream().WriteAsync(messageBytes, 0, messageBytes.Length);
                     }
@@ -510,7 +514,7 @@ namespace RemotePainting.Networking
         {
             int suffix = 2;
             string uniqueName = name;
-            while (_currentClients.Any(c => c.Name == uniqueName) || uniqueName == _hostName)
+            while (_currentClients.Any(c => c.Name == uniqueName) || uniqueName == _userName)
             {
                 uniqueName = $"{name}_{suffix}";
                 suffix++;
@@ -566,11 +570,11 @@ namespace RemotePainting.Networking
             byte[] messageBytes;
             if (data.StartsWith("DRAW:"))
             {
-                messageBytes = Encoding.UTF8.GetBytes($"{data}|(Server){_hostName}\n");
+                messageBytes = Encoding.UTF8.GetBytes($"{data}|{_userName}\n");
             }
             else
             {
-                messageBytes = Encoding.UTF8.GetBytes($"Message:(Server){_hostName}|{data}\n");
+                messageBytes = Encoding.UTF8.GetBytes($"Message:{_userName}|{data}\n");
             }
 
             var disconnectedClients = new List<ClientInfo>();

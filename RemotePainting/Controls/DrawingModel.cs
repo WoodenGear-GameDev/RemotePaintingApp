@@ -8,6 +8,8 @@ namespace RemotePainting.Controls
     public record BeginStroke(string Author, int Id, uint Color, float Thickness, float X, float Y) : DrawCommand;
     public record AddPoint(string Author, int Id, float X, float Y) : DrawCommand;
     public record RemoveStroke(string Author, int Id) : DrawCommand;
+    public record CursorMove(string Author, float X, float Y) : DrawCommand;
+    public record CursorHide(string Author) : DrawCommand;
     public record ClearAll : DrawCommand;
 
     public class Stroke

@@ -1,0 +1,40 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:RemotePainting.ViewModels.Menus"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             x:Class="RemotePainting.Views.UsernameView"
+             x:DataType="vm:UsernameVM">
+
+  <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="15" Width="320">
+    <Image Source="/Assets/AppIcon.png" Width="120" Height="120" HorizontalAlignment="Center" Margin="0,0,0,20"/>
+    <TextBlock Text="Enter your name"
+               FontSize="28"
+               FontWeight="Bold"
+               Foreground="#ca80de"
+               HorizontalAlignment="Center"
+               Margin="0,0,0,20"/>
+
+    <TextBox Classes="message-box"
+             Text="{Binding UserName, Mode=TwoWay}"
+             Watermark="Your name"
+             MaxLength="20"
+             BorderThickness="2"
+             Height="45"
+             VerticalContentAlignment="Center"
+             CornerRadius="8">
+      <TextBox.KeyBindings>
+        <KeyBinding Gesture="Enter" Command="{Binding ConfirmCommand}"/>
+      </TextBox.KeyBindings>
+    </TextBox>
+
+    <Button Content="Continue"
+            Command="{Binding ConfirmCommand}"
+            Background="#ca80de"
+            Foreground="White"
+            HorizontalAlignment="Stretch"
+            HorizontalContentAlignment="Center"
+            Height="45"/>
+  </StackPanel>
+</UserControl>

@@ -2,10 +2,12 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
-using System.IO;
 using Avalonia.Media.Imaging;
+using Avalonia.Threading;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using System.Linq;
 
 namespace RemotePainting.Controls
@@ -32,11 +34,24 @@ namespace RemotePainting.Controls
 
         private readonly List<Stroke> _strokes = new();
         private readonly Dictionary<(string Author, int Id), Stroke> _byId = new();
+        private readonly Dictionary<string, (Point Pos, long Seen)> _cursors = new();
         private int _currentId = -1;
         private int _nextId;
         private bool _forExport;
 
+        private DispatcherTimer? _cursorTimer;
+        private long _lastCursorSent;
+
         private const double MinDistancePx = 1.5;
+        private const long CursorSendIntervalMs = 33;
+        private const long CursorTimeoutMs = 10_000;
+
+        private static readonly Color[] Palette =
+        {
+            Color.Parse("#e6194b"), Color.Parse("#3cb44b"), Color.Parse("#4363d8"),
+            Color.Parse("#f58231"), Color.Parse("#911eb4"), Color.Parse("#008080"),
+            Color.Parse("#9a6324"), Color.Parse("#800000")
+        };
 
         public event Action<DrawCommand>? CommandProduced;
 
@@ -65,6 +80,14 @@ namespace RemotePainting.Controls
                     _strokes.Clear();
                     _byId.Clear();
                     break;
+
+                case CursorMove c:
+                    _cursors[c.Author] = (new Point(c.X, c.Y), Environment.TickCount64);
+                    break;
+
+                case CursorHide h:
+                    _cursors.Remove(h.Author);
+                    break;
             }
             InvalidateVisual();
         }
@@ -91,6 +114,29 @@ namespace RemotePainting.Controls
 
         private Point Norm(Point p) => new(p.X / Bounds.Width, p.Y / Bounds.Height);
 
+        protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+        {
+            base.OnAttachedToVisualTree(e);
+            _cursorTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            _cursorTimer.Tick += (_, _) =>
+            {
+                var now = Environment.TickCount64;
+                var stale = _cursors.Where(kv => now - kv.Value.Seen > CursorTimeoutMs)
+                                    .Select(kv => kv.Key).ToList();
+                if (stale.Count == 0) return;
+                foreach (var k in stale) _cursors.Remove(k);
+                InvalidateVisual();
+            };
+            _cursorTimer.Start();
+        }
+
+        protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+        {
+            _cursorTimer?.Stop();
+            _cursorTimer = null;
+            base.OnDetachedFromVisualTree(e);
+        }
+
         protected override void OnPointerPressed(PointerPressedEventArgs e)
         {
             if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
@@ -105,9 +151,20 @@ namespace RemotePainting.Controls
 
         protected override void OnPointerMoved(PointerEventArgs e)
         {
-            if (_currentId < 0) return;
+            if (Bounds.Width <= 0 || Bounds.Height <= 0) return;
 
             var p = Norm(e.GetPosition(this));
+
+            // Позиция курсора для других пользователей (с ограничением частоты)
+            var now = Environment.TickCount64;
+            if (now - _lastCursorSent >= CursorSendIntervalMs)
+            {
+                _lastCursorSent = now;
+                CommandProduced?.Invoke(new CursorMove("Me",
+                    (float)Math.Clamp(p.X, 0, 1), (float)Math.Clamp(p.Y, 0, 1)));
+            }
+
+            if (_currentId < 0) return;
 
             if (_byId.TryGetValue(("Me", _currentId), out var stroke) && stroke.Points.Count > 0)
             {
@@ -118,6 +175,12 @@ namespace RemotePainting.Controls
             }
 
             Do(new AddPoint("Me", _currentId, (float)p.X, (float)p.Y));
+        }
+
+        protected override void OnPointerExited(PointerEventArgs e)
+        {
+            base.OnPointerExited(e);
+            CommandProduced?.Invoke(new CursorHide("Me"));
         }
 
         protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -164,7 +227,37 @@ namespace RemotePainting.Controls
                 for (int i = 1; i < s.Points.Count; i++)
                     ctx.DrawLine(pen, ToPx(s.Points[i - 1]), ToPx(s.Points[i]));
             }
+
+            if (!_forExport)
+            {
+                foreach (var (name, info) in _cursors)
+                    DrawCursorLabel(ctx, name, info.Pos);
+            }
         }
+
+        private void DrawCursorLabel(DrawingContext ctx, string name, Point pos)
+        {
+            var px = ToPx(pos);
+            var color = Palette[name.Sum(ch => (int)ch) % Palette.Length];
+            var brush = new SolidColorBrush(color);
+
+            ctx.DrawEllipse(brush, new Pen(Brushes.White, 1.5), px, 5, 5);
+
+            var text = new FormattedText(name, CultureInfo.CurrentUICulture,
+                FlowDirection.LeftToRight, Typeface.Default, 12, Brushes.White);
+
+            const double padX = 6, padY = 2;
+            var w = text.Width + padX * 2;
+            var h = text.Height + padY * 2;
+            var x = px.X + 10;
+            var y = px.Y + 10;
+            if (x + w > Bounds.Width) x = px.X - 10 - w;
+            if (y + h > Bounds.Height) y = px.Y - 10 - h;
+
+            ctx.DrawRectangle(brush, null, new Rect(x, y, w, h), 4, 4);
+            ctx.DrawText(text, new Point(x + padX, y + padY));
+        }
+
         public void SaveToPng(Stream stream)
         {
             var size = new PixelSize((int)Bounds.Width, (int)Bounds.Height);
