@@ -11,8 +11,8 @@
   <Grid RowDefinitions="Auto, *, Auto" ColumnDefinitions="*, Auto" Margin="20">
 
     <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12">
-      <ColorPicker Color="{Binding SelectedColor, Mode=TwoWay}" />
-      <TextBlock Text="Width" VerticalAlignment="Center"/>
+      <ColorPicker Color="{Binding SelectedColor, Mode=TwoWay}"/>
+      <TextBlock Text="Thickness" FontWeight="Bold" Foreground="#ca80de" VerticalAlignment="Center"/>
       <Slider Minimum="1" Maximum="40" Width="180"
               Value="{Binding Thickness, Mode=TwoWay}"
               VerticalAlignment="Center"/>

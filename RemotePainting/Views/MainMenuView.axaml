@@ -8,29 +8,45 @@
              x:DataType="vm:MainMenuVM">
 
   <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="15" Width="320">
-    <Image Source="/Assets/AppIcon.png" Width="120" Height="120" HorizontalAlignment="Center" Margin="0,0,0,20"/>
+    <Image Source="/Assets/AppIcon.png" Width="150" Height="150" HorizontalAlignment="Center" Margin="0,0,0,20"/>
     <TextBlock Text="Remote Painting" 
-               FontSize="28" 
-               FontWeight="Bold"
+               FontSize="32" 
+               FontWeight="Black"
                Foreground="#ca80de"
                HorizontalAlignment="Center" 
                Margin="0,0,0,20"/>
     
-    <Button Content="Create Canvas" 
+    <Button HorizontalContentAlignment="Left"
+            VerticalContentAlignment="Center"
             Command="{Binding CreateServerCommand}" 
             Background="#ca80de"
             Foreground="White"
-            HorizontalAlignment="Stretch" 
-            HorizontalContentAlignment="Center" 
-            Height="45"/>
+            HorizontalAlignment="Center"
+            FontSize="16"
+            FontWeight="Bold"
+            Width="200" 
+            Height="60">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
+                <Image Source="/Assets/canvas.png" VerticalAlignment="Center" Width="35" Height="35" Margin="5"/>
+                <TextBlock Text="Create Canvas" VerticalAlignment="Center"/>
+            </StackPanel>
+    </Button>
     
-    <Button Content="Join Canvas" 
-            Command="{Binding JoinServerCommand}"
+    <Button Command="{Binding JoinServerCommand}"
             Background="#ca80de"
             Foreground="White"
-            HorizontalAlignment="Stretch" 
-            HorizontalContentAlignment="Center" 
-            Height="45"/>
+            HorizontalContentAlignment="Left"
+            VerticalContentAlignment="Center"
+            HorizontalAlignment="Center"
+            FontSize="16"
+            FontWeight="Bold"
+            Width="200" 
+            Height="60">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
+                <Image Source="/Assets/join.png" VerticalAlignment="Center" Width="35" Height="35" Margin="5"/>
+                <TextBlock Text="Join Server" VerticalAlignment="Center"/>
+            </StackPanel>
+    </Button>
   </StackPanel>
   
 </UserControl>

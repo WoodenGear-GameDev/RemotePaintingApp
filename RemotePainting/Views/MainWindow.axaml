@@ -5,14 +5,15 @@
 
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="600"
+        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
 
         x:Class="RemotePainting.Views.MainWindow"
         x:DataType="vm:MainRootViewModel"
 
         Width="1200"
         Height="800"
-        CanResize="False"
+        CanResize="True"
+        Background="#242224"
 
         Icon="/Assets/AppIcon.png"
         Title="Remote Painting">
@@ -68,26 +69,28 @@
         </Style>
     </Window.Styles>
 
-    <Border Background="#242224">
-        <ContentControl Content="{Binding CurrentViewModel}">
-            <ContentControl.DataTemplates>
-      
-              <!-- 1. Если активен MainMenuViewModel, показываем MainMenuView -->
-              <DataTemplate DataType="vm:Menus.MainMenuVM">
-                <v:MainMenuView />
-              </DataTemplate>
+    <Viewbox Stretch="Uniform">
+        <Border Width="1200" Height="800" Background="#242224">
+            <ContentControl Content="{Binding CurrentViewModel}">
+                <ContentControl.DataTemplates>
+          
+                  <!-- 1. Если активен MainMenuViewModel, показываем MainMenuView -->
+                  <DataTemplate DataType="vm:Menus.MainMenuVM">
+                    <v:MainMenuView />
+                  </DataTemplate>
 
-              <!-- 2. Если активен ServerListViewModel, показываем ServerListView -->
-              <DataTemplate DataType="vm:Menus.ServerListVM">
-                <v:ServerListView />
-              </DataTemplate>
+                  <!-- 2. Если активен ServerListViewModel, показываем ServerListView -->
+                  <DataTemplate DataType="vm:Menus.ServerListVM">
+                    <v:ServerListView />
+                  </DataTemplate>
 
-              <!-- 3. Если активен CanvasViewModel, показываем CanvasView -->
-              <DataTemplate DataType="vm:Menus.CanvasVM">
-                <v:CanvasView />
-              </DataTemplate>
+                  <!-- 3. Если активен CanvasViewModel, показываем CanvasView -->
+                  <DataTemplate DataType="vm:Menus.CanvasVM">
+                    <v:CanvasView />
+                  </DataTemplate>
 
-            </ContentControl.DataTemplates>
-          </ContentControl>
-    </Border>
+                </ContentControl.DataTemplates>
+              </ContentControl>
+        </Border>
+    </Viewbox>
 </Window>

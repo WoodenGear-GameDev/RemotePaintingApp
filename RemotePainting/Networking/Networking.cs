@@ -291,7 +291,8 @@ namespace RemotePainting.Networking
                 {
                     if (ip.AddressFamily == AddressFamily.InterNetwork)
                     {
-                        if (ip.ToString().StartsWith("192.168.") || ip.ToString().StartsWith("10."))
+                        string ipStr = ip.ToString();
+                        if (ipStr.StartsWith("192.168.") || ipStr.StartsWith("10.") || (ipStr.StartsWith("172.") && IsValid172Range(ipStr)))
                         {
                             return $"SERVER:{_hostName}|{ip}";
                         }
@@ -304,6 +305,16 @@ namespace RemotePainting.Networking
             }
 
             return $"SERVER:{_hostName}|127.0.0.1";
+        }
+
+        private bool IsValid172Range(string ipStr)
+        {
+            var parts = ipStr.Split('.');
+            if (parts.Length > 1 && int.TryParse(parts[1], out int secondOctet))
+            {
+                return secondOctet >= 16 && secondOctet <= 31;
+            }
+            return false;
         }
 
         public void Start()
