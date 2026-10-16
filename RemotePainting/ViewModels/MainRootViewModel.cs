@@ -11,7 +11,12 @@ public partial class MainRootViewModel : ViewModelBase
 
     public MainRootViewModel()
     {
-        ShowMainMenu();
+        ShowUsername();  
+    }
+
+    public void ShowUsername()
+    {
+        CurrentViewModel = new Menus.UsernameVM(this, _paintingAppModel);
     }
 
     public void ShowMainMenu()
