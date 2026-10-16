@@ -18,8 +18,6 @@ namespace RemotePainting.ViewModels.Menus
         [ObservableProperty]
         private List<ServerInfo>? _discoveredServers = new();
 
-        private bool _isSearching = false;
-
         public ServerListVM(MainRootViewModel navigation, PaintingAppModel paintingAppModel)
         {
             _navigation = navigation;
@@ -27,7 +25,12 @@ namespace RemotePainting.ViewModels.Menus
 
             _cts = new CancellationTokenSource();
 
-            _ = SearchingLoop();
+            _paintingAppModel.StartFindingServers(OnNewServerFound);
+        }
+
+        public void OnNewServerFound()
+        {
+            DiscoveredServers = _paintingAppModel.GetDiscoveredServers();
         }
 
         [RelayCommand]
@@ -40,44 +43,10 @@ namespace RemotePainting.ViewModels.Menus
         [RelayCommand]
         private async Task ConnectToServer(ServerInfo selectedServer)
         {
-            System.Diagnostics.Debug.WriteLine($"{selectedServer.IpAddress}");
             if (selectedServer == null) return;
 
-            _paintingAppModel.ConnectToCanvas(selectedServer.IpAddress);
+            _paintingAppModel.ConnectToCanvas(selectedServer);
             _navigation.ShowCanvas();
-        }
-
-        private async Task ExecuteSearchAsync(CancellationToken cancellationToken)
-        {
-            if (_isSearching) return;
-
-            _isSearching = true;
-            try
-            {
-                await _paintingAppModel.RefreshAvailableServers(cancellationToken);
-                DiscoveredServers = _paintingAppModel.Servers;
-            }
-            finally
-            {
-                _isSearching = false;
-            }
-        }
-
-        private async Task SearchingLoop()
-        {
-            while (!_cts!.IsCancellationRequested)
-            {
-                await ExecuteSearchAsync(_cts.Token);
-
-                try
-                {
-                    await Task.Delay(2000, _cts.Token);
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
-            }
         }
     }
 }

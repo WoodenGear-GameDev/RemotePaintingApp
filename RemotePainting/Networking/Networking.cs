@@ -1,5 +1,8 @@
-﻿using System;
+﻿using Avalonia.Threading;
+using Makaretu.Dns;
+using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -10,58 +13,52 @@ using System.Threading.Tasks;
 
 namespace RemotePainting.Networking
 {
-    static class Network
+    public class NetworkFinder
     {
-        public static async Task<List<ServerInfo>> DiscoverAllServersAsync(int port, TimeSpan timeout, CancellationToken cancellationToken)
+        public List<ServerInfo> Servers { get; } = new();
+        public event Action? OnNewServerFound;
+
+        private ServiceDiscovery? _serviceDiscovery;
+
+        public void StartSearching()
         {
-            using var udpClient = new UdpClient();
-            udpClient.EnableBroadcast = true;
+            Servers.Clear();
+            _serviceDiscovery = new ServiceDiscovery();
 
-            byte[] requestBytes = Encoding.UTF8.GetBytes("GET_SERVER_INFOS");
-            IPEndPoint broadcastEndpoint = new IPEndPoint(IPAddress.Broadcast, port);
-
-            await udpClient.SendAsync(requestBytes, requestBytes.Length, broadcastEndpoint);
-
-            var foundServers = new List<IPEndPoint>();
-            var foundServerInfos = new List<ServerInfo>();
-
-            using var cts = new CancellationTokenSource(timeout);
-
-            try
+            _serviceDiscovery.ServiceInstanceDiscovered += (s, e) =>
             {
-                while (!cts.Token.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+                foreach (var answer in e.Message.Answers.OfType<SRVRecord>())
                 {
-                    var result = await udpClient.ReceiveAsync(cts.Token);
-                    string response = Encoding.UTF8.GetString(result.Buffer);
+                    string hostName = answer.Target.ToString().TrimEnd('.');
+                    int port = answer.Port;
 
-                    if (response.StartsWith("SERVER:"))
+                    var ipRecord = e.Message.AdditionalRecords
+                        .OfType<ARecord>()
+                        .FirstOrDefault(a => a.Name == answer.Target);
+
+                    if (ipRecord != null)
                     {
-                        string payload = response.Substring("SERVER:".Length);
+                        string ipAddress = ipRecord.Address.ToString();
 
-                        string[] parts = payload.Split('|');
-                        if (parts.Length == 2)
+                        Dispatcher.UIThread.Post(() =>
                         {
-                            string hostName = parts[0];
-                            string ipString = parts[1];
-
-                            if (IPAddress.TryParse(ipString, out IPAddress? ipAddress))
+                            bool exists = Servers.Any(srv => srv.IpAddress == ipAddress && srv.Port == port);
+                            if (!exists)
                             {
-                                IPEndPoint endpoint = new IPEndPoint(ipAddress, port);
-                                if (!foundServers.Any(s => s.Address.Equals(endpoint.Address)))
-                                {
-                                    foundServers.Add(endpoint);
-                                    foundServerInfos.Add(new ServerInfo(hostName, ipAddress));
-                                }
+                                Servers.Add(new ServerInfo(hostName, ipAddress, port));
+                                OnNewServerFound?.Invoke();
                             }
-                        }
+                        });
                     }
                 }
-            }
-            catch (OperationCanceledException)
-            {
+            };
 
-            }
-            return foundServerInfos;
+            _serviceDiscovery.QueryServiceInstances("_remotepainting._tcp");
+        }
+
+        public void StopSearching()
+        {
+            _serviceDiscovery?.Dispose();
         }
     }
     public interface INetworkService
@@ -257,12 +254,14 @@ namespace RemotePainting.Networking
 
     public class ServerInfo
     {
-        public string HostName { get; private set; }
-        public string IpAddress { get; private set; }
-        public ServerInfo(string hostName, IPAddress ipAddress)
+        public string HostName { get; init; }
+        public string IpAddress { get; init; }
+        public int Port { get; init; }
+        public ServerInfo(string hostName, string ipAddress, int port)
         {
             HostName = hostName;
-            IpAddress = ipAddress.ToString();
+            IpAddress = ipAddress;
+            Port = port;
         }
     }
 
@@ -277,48 +276,29 @@ namespace RemotePainting.Networking
         private TcpListener? _tcpListener;
         private List<ClientInfo> _currentClients = new();
         private CancellationTokenSource? _cts;
-        private readonly string _hostName = Dns.GetHostName();
         private readonly string _userName;
+
+        private ServiceDiscovery? _serviceDiscovery;
+        private ServiceProfile? _serviceProfile;
 
         public Server(int port, string userName)
         {
             _port = port;
             _userName = userName;
         }
-        private string GetServerInfo()
+
+        public void StartAdvertising(string serverName, int tcpPort)
         {
-            try
-            {
-                var hostEntry = Dns.GetHostEntry(_hostName);
+            _serviceProfile = new ServiceProfile(serverName, "_remotepainting._tcp", (ushort)tcpPort);
 
-                foreach (var ip in hostEntry.AddressList)
-                {
-                    if (ip.AddressFamily == AddressFamily.InterNetwork)
-                    {
-                        string ipStr = ip.ToString();
-                        if (ipStr.StartsWith("192.168.") || ipStr.StartsWith("10.") || (ipStr.StartsWith("172.") && IsValid172Range(ipStr)))
-                        {
-                            return $"SERVER:{_hostName}|{ip}";
-                        }
-                    }
-                }
-            }
-            catch (Exception)
-            {
-
-            }
-
-            return $"SERVER:{_hostName}|127.0.0.1";
+            _serviceDiscovery = new ServiceDiscovery();
+            _serviceDiscovery.Advertise(_serviceProfile);
         }
 
-        private bool IsValid172Range(string ipStr)
+        public void StopAdvertising()
         {
-            var parts = ipStr.Split('.');
-            if (parts.Length > 1 && int.TryParse(parts[1], out int secondOctet))
-            {
-                return secondOctet >= 16 && secondOctet <= 31;
-            }
-            return false;
+            _serviceDiscovery?.Unadvertise(_serviceProfile);
+            _serviceDiscovery?.Dispose();
         }
 
         public void Start()
@@ -330,7 +310,7 @@ namespace RemotePainting.Networking
 
                 _cts = new CancellationTokenSource();
 
-                _ = OpenForSearch(_port, _cts.Token);
+                StartAdvertising(_userName, _port);
                 _ = StartListeningForClients(_port, _cts.Token);
 
                 IsRunning = true;
@@ -350,6 +330,7 @@ namespace RemotePainting.Networking
         {
             try
             {
+                StopAdvertising();
                 _cts?.Cancel();
                 _tcpListener?.Stop();
                 foreach (var client in _currentClients)
@@ -364,34 +345,6 @@ namespace RemotePainting.Networking
             finally
             {
                 IsRunning = false;
-            }
-        }
-
-        private async Task OpenForSearch(int port, CancellationToken cancellationToken)
-        {
-            using var udpServer = new UdpClient(port);
-            while (!cancellationToken.IsCancellationRequested)
-            {
-                try
-                {
-                    var result = await udpServer.ReceiveAsync(cancellationToken);
-                    string message = Encoding.UTF8.GetString(result.Buffer);
-
-                    if (message == "GET_SERVER_INFOS")
-                    {
-                        byte[] responseBytes = Encoding.UTF8.GetBytes(GetServerInfo());
-
-                        await udpServer.SendAsync(responseBytes, responseBytes.Length, result.RemoteEndPoint);
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
-                catch (SocketException)
-                {
-                    await Task.Delay(1000, cancellationToken);
-                }
             }
         }
 
