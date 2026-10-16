@@ -18,7 +18,7 @@ namespace RemotePainting.ViewModels.Menus
 
         [ObservableProperty]
         private double _thickness = 3;
-        [ObservableProperty] 
+        [ObservableProperty]
         private string _userInput = string.Empty;
         [ObservableProperty]
         private string _chatHistory = string.Empty;
@@ -27,7 +27,6 @@ namespace RemotePainting.ViewModels.Menus
         {
             _navigation = navigation;
             _paintingAppModel = paintingAppModel;
-            _paintingAppModel.SetDisconnectedEvent(OnDisconnectedFromServer);
             _paintingAppModel.OnMessageReceived += ShowNewMessage;
         }
 
@@ -36,10 +35,15 @@ namespace RemotePainting.ViewModels.Menus
             _paintingAppModel.AttachBoard(board);
         }
 
+        public void ConnectToCanvas(ServerInfo serverInfo)
+        {
+            _paintingAppModel.ConnectToCanvas(serverInfo, OnDisconnectedFromServer);
+        }
+
         public void OnDisconnectedFromServer()
         {
             _paintingAppModel.CloseCanvas();
-            _navigation.ShowMainMenu();
+            _navigation.ShowServerList();
         }
 
         [RelayCommand]

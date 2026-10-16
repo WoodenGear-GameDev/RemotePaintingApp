@@ -15,8 +15,8 @@ namespace RemotePainting.Models
         private static readonly CultureInfo IC = CultureInfo.InvariantCulture;
         public event Action<string>? OnDrawDataReceived;
         public event Action<string, string>? OnMessageReceived;
+        private readonly NetworkFinder _networkFinder = new();
         private INetworkService? _networkService;
-        public List<ServerInfo> Servers { get; private set; } = new();
         private int _port = 7777;
         private IDrawingBoard? _drawingBoard;
 
@@ -24,6 +24,17 @@ namespace RemotePainting.Models
         {
             _drawingBoard = board;
             _drawingBoard.CommandProduced += SendDrawingData;
+        }
+
+        public void StartFindingServers(Action action)
+        {
+            _networkFinder.OnNewServerFound += action;
+            _networkFinder.StartSearching();
+        }
+
+        public List<ServerInfo> GetDiscoveredServers()
+        {
+            return _networkFinder.Servers;
         }
 
         public void LoadServerBoard(ClientInfo clientInfo)
@@ -197,10 +208,12 @@ namespace RemotePainting.Models
             _networkService.Start();
         }
 
-        public void ConnectToCanvas(string ipAddress)
+        public void ConnectToCanvas(ServerInfo serverInfo, Action disconectEvent)
         {
-            _networkService = new Networking.Client(ipAddress, _port, UserName);
+            _networkFinder.StopSearching();
+            _networkService = new Networking.Client(serverInfo.IpAddress, serverInfo.Port, UserName);
             _networkService.OnDataReceived += ReceiveMessage;
+            _networkService.Disconnected += disconectEvent;
             _networkService.Start();
         }
 
@@ -210,18 +223,6 @@ namespace RemotePainting.Models
             _networkService = null;
         }
 
-        public async Task RefreshAvailableServers(CancellationToken cancellationToken)
-        {
-            Servers = await Networking.Network.DiscoverAllServersAsync(_port, TimeSpan.FromSeconds(3), cancellationToken);
-        }
-
-        public void SetDisconnectedEvent(Action onDisconnected)
-        {
-            if (_networkService != null)
-            {
-                _networkService.Disconnected += onDisconnected;
-            }
-        }
         private string _userName = "Anonymous";
         public string UserName
         {

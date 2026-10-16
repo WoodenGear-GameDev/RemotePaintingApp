@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using RemotePainting.Models;
+using RemotePainting.Networking;
 
 namespace RemotePainting.ViewModels;
 
@@ -11,7 +12,7 @@ public partial class MainRootViewModel : ViewModelBase
 
     public MainRootViewModel()
     {
-        ShowUsername();  
+        ShowUsername();
     }
 
     public void ShowUsername()
@@ -29,8 +30,15 @@ public partial class MainRootViewModel : ViewModelBase
         CurrentViewModel = new Menus.ServerListVM(this, _paintingAppModel);
     }
 
-    public void ShowCanvas()
+    public void CreateNewCanvas()
     {
         CurrentViewModel = new Menus.CanvasVM(this, _paintingAppModel);
+    }
+
+    public void ConnectToCanvas(ServerInfo serverInfo)
+    {
+        var canvasVM = new Menus.CanvasVM(this, _paintingAppModel);
+        CurrentViewModel = canvasVM;
+        canvasVM.ConnectToCanvas(serverInfo);
     }
 }
