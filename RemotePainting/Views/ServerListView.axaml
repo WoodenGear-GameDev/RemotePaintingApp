@@ -3,11 +3,11 @@
              xmlns:vm="using:RemotePainting.ViewModels.Menus"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
              x:Class="RemotePainting.Views.ServerListView"
              x:DataType="vm:ServerListVM">
 
-  <Grid RowDefinitions="Auto, *, Auto" Margin="25">
+  <Grid RowDefinitions="Auto, *, Auto, Auto" Margin="25">
     
     <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Left" Spacing="10">
         <Image Source="/Assets/searching.png" Width="35" Height="35" Margin="0,0,0,10"/>
@@ -36,18 +36,40 @@
       </ListBox.ItemTemplate>
     </ListBox>
 
-    <StackPanel Grid.Row="2" 
-                Orientation="Horizontal" 
-                Spacing="10" 
-                HorizontalAlignment="Right">
-      <Button Content="Back"
-              FontWeight="Bold"
-              Command="{Binding BackToMainMenuCommand}"
-              Width="90"
-              Foreground="White"
-              Background="#ca80de"
-              HorizontalContentAlignment="Center"/>
-    </StackPanel>
+    <TextBlock Grid.Row="2" 
+               Text="Connect by IP:"
+               FontSize="16"
+               FontWeight="Bold"
+               Foreground="#ca80de"
+               Margin="0, 5, 0, 5"/>
+
+    <Grid Grid.Row="3" ColumnDefinitions="*, Auto, Auto">
+        <TextBox Grid.Column="0"
+            Classes="message-box"
+            Text=""
+            BorderThickness="2"
+            Height="30"
+            FontSize="12"
+            CornerRadius="8"
+            Padding="5, 5, 5, 5"/>
+        <Button Grid.Column="1"
+            Content="Connect"
+            FontWeight="Bold"
+            
+            Width="90"
+            Foreground="White"
+            Background="#ca80de"
+            HorizontalContentAlignment="Center"
+            Margin="10, 0, 200, 0"/>
+        <Button Grid.Column="2"
+            Content="Back"
+            FontWeight="Bold"
+            Command="{Binding BackToMainMenuCommand}"
+            Width="90"
+            Foreground="White"
+            Background="#ca80de"
+            HorizontalContentAlignment="Center"/>
+    </Grid>
     
   </Grid>
   

@@ -27,5 +27,11 @@ namespace RemotePainting.ViewModels.Menus
         {
             _navigation.ShowServerList();
         }
+
+        [RelayCommand]
+        private void ShowUsername()
+        {
+            _navigation.ShowUsername();
+        }
     }
 }
