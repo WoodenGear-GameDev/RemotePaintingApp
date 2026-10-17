@@ -3,6 +3,7 @@ using RemotePainting.Networking;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,7 +19,24 @@ namespace RemotePainting.Models
         private readonly NetworkFinder _networkFinder = new();
         private INetworkService? _networkService;
         private int _port = 7777;
+        public int Port => _port;
         private IDrawingBoard? _drawingBoard;
+        private readonly string _userNameFilePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            "RemotePainting",
+            "username.txt");
+        private readonly string _legacyUserNameFilePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "RemotePainting",
+            "username.txt");
+
+        public bool HasSavedUserName { get; private set; }
+        public string? UserNameLoadError { get; private set; }
+
+        public PaintingAppModel()
+        {
+            LoadUserName();
+        }
 
         public void AttachBoard(IDrawingBoard board)
         {
@@ -228,6 +246,46 @@ namespace RemotePainting.Models
         {
             get => _userName;
             set => _userName = Sanitize(value);
+        }
+
+        public void SaveUserName(string userName)
+        {
+            string sanitizedUserName = Sanitize(userName);
+            string? directory = Path.GetDirectoryName(_userNameFilePath);
+            if (directory is null)
+                throw new InvalidOperationException("The user name file path has no parent directory.");
+
+            Directory.CreateDirectory(directory);
+            File.WriteAllText(_userNameFilePath, sanitizedUserName);
+            UserName = sanitizedUserName;
+            HasSavedUserName = true;
+            UserNameLoadError = null;
+        }
+
+        private void LoadUserName()
+        {
+            try
+            {
+                string? savedUserName = null;
+                if (File.Exists(_userNameFilePath))
+                    savedUserName = File.ReadAllText(_userNameFilePath);
+                else if (File.Exists(_legacyUserNameFilePath))
+                    savedUserName = File.ReadAllText(_legacyUserNameFilePath);
+
+                if (string.IsNullOrWhiteSpace(savedUserName))
+                    return;
+
+                UserName = savedUserName;
+                HasSavedUserName = true;
+            }
+            catch (IOException exception)
+            {
+                UserNameLoadError = exception.Message;
+            }
+            catch (UnauthorizedAccessException exception)
+            {
+                UserNameLoadError = exception.Message;
+            }
         }
 
         private static string Sanitize(string? name)

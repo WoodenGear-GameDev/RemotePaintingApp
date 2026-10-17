@@ -1,6 +1,8 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RemotePainting.Models;
+using System;
+using System.IO;
 
 namespace RemotePainting.ViewModels.Menus
 {
@@ -17,15 +19,36 @@ namespace RemotePainting.ViewModels.Menus
         {
             _navigation = navigation;
             _paintingAppModel = paintingAppModel;
+            UserName = paintingAppModel.HasSavedUserName ? paintingAppModel.UserName : string.Empty;
+            ErrorMessage = paintingAppModel.UserNameLoadError is null
+                ? string.Empty
+                : $"Could not load your saved name: {paintingAppModel.UserNameLoadError}";
         }
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasErrorMessage))]
+        private string _errorMessage = string.Empty;
+
+        public bool HasErrorMessage => !string.IsNullOrEmpty(ErrorMessage);
 
         private bool CanConfirm() => !string.IsNullOrWhiteSpace(UserName);
 
         [RelayCommand(CanExecute = nameof(CanConfirm))]
         private void Confirm()
         {
-            _paintingAppModel.UserName = UserName;
-            _navigation.ShowMainMenu();
+            try
+            {
+                _paintingAppModel.SaveUserName(UserName);
+                _navigation.ShowMainMenu();
+            }
+            catch (IOException exception)
+            {
+                ErrorMessage = $"Could not save your name: {exception.Message}";
+            }
+            catch (UnauthorizedAccessException exception)
+            {
+                ErrorMessage = $"Could not save your name: {exception.Message}";
+            }
         }
     }
 }

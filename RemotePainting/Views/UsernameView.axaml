@@ -29,6 +29,11 @@
       </TextBox.KeyBindings>
     </TextBox>
 
+    <TextBlock Text="{Binding ErrorMessage}"
+               Foreground="Red"
+               TextWrapping="Wrap"
+               IsVisible="{Binding HasErrorMessage}"/>
+
     <Button Content="Continue"
             Command="{Binding ConfirmCommand}"
             FontWeight="Bold"

@@ -4,6 +4,7 @@ using RemotePainting.Models;
 using RemotePainting.Networking;
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -17,6 +18,15 @@ namespace RemotePainting.ViewModels.Menus
 
         [ObservableProperty]
         private List<ServerInfo>? _discoveredServers = new();
+
+        [ObservableProperty]
+        private string _ipAddress = string.Empty;
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasErrorMessage))]
+        private string _errorMessage = string.Empty;
+
+        public bool HasErrorMessage => !string.IsNullOrEmpty(ErrorMessage);
 
         public ServerListVM(MainRootViewModel navigation, PaintingAppModel paintingAppModel)
         {
@@ -46,6 +56,20 @@ namespace RemotePainting.ViewModels.Menus
             if (selectedServer == null) return;
 
             _navigation.ConnectToCanvas(selectedServer);
+        }
+
+        [RelayCommand]
+        private void ConnectByIp()
+        {
+            if (!IPAddress.TryParse(IpAddress.Trim(), out IPAddress? address))
+            {
+                ErrorMessage = "Enter a valid IP address, for example 192.168.1.10.";
+                return;
+            }
+
+            ErrorMessage = string.Empty;
+            _navigation.ConnectToCanvas(
+                new ServerInfo("Manual connection", address.ToString(), _paintingAppModel.Port));
         }
     }
 }

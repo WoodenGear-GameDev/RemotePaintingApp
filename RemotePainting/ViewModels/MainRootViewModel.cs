@@ -12,7 +12,10 @@ public partial class MainRootViewModel : ViewModelBase
 
     public MainRootViewModel()
     {
-        ShowUsername();
+        if (_paintingAppModel.HasSavedUserName)
+            ShowMainMenu();
+        else
+            ShowUsername();
     }
 
     public void ShowUsername()
