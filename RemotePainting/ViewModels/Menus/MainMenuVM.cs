@@ -18,8 +18,7 @@ namespace RemotePainting.ViewModels.Menus
         [RelayCommand]
         private void CreateServer()
         {
-            _navigation.CreateNewCanvas();
-            _paintingAppModel.CreateNewCanvas();
+            _navigation.CreateNewCanvas(_paintingAppModel.CreateNewCanvas);
         }
 
         [RelayCommand]

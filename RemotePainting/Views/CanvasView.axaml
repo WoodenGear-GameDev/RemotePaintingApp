@@ -8,82 +8,120 @@
              x:Class="RemotePainting.Views.CanvasView"
              x:DataType="vm:CanvasVM">
 
-  <Grid RowDefinitions="Auto, *, Auto" ColumnDefinitions="*, Auto" Margin="20">
+      <Grid RowDefinitions="Auto, *, Auto" ColumnDefinitions="*, Auto" Margin="20">
 
-    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12">
-      <ColorPicker Color="{Binding SelectedColor, Mode=TwoWay}"/>
-      <TextBlock Text="Thickness" FontWeight="Bold" Foreground="#ca80de" VerticalAlignment="Center"/>
-      <Slider Minimum="1" Maximum="40" Width="180"
-              Value="{Binding Thickness, Mode=TwoWay}"
-              VerticalAlignment="Center"/>
-      <TextBlock Text="{Binding Thickness, StringFormat={}{0:0}}"
-                 VerticalAlignment="Center" Width="24"/>
-    </StackPanel>
+        <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Left">
+            <ColorPicker Color="{Binding SelectedColor, Mode=TwoWay}"/>
+            <TextBlock Text="Thickness" FontWeight="Bold" Foreground="#ca80de" VerticalAlignment="Center"/>
+            <Slider Minimum="1" Maximum="40" Width="180"
+                    Value="{Binding Thickness, Mode=TwoWay}"
+                    VerticalAlignment="Center"/>
+            <TextBlock Text="{Binding Thickness, StringFormat={}{0:0}}"
+                       VerticalAlignment="Center" Width="24"/>
+        </StackPanel>
 
-    <Border Grid.Row="1"
-            BorderBrush="#ca80de"
-            BorderThickness="2"
-            Background="White"
-            CornerRadius="8"
-            ClipToBounds="True"
-            Margin="0,15">
-      <controls:DrawingCanvas x:Name="Board"
-                              BrushColor="{Binding SelectedColor}"
-                              BrushThickness="{Binding Thickness}"/>
-    </Border>
+        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="5" HorizontalAlignment="Left" Margin="20, 0, 0, 0"
+                    IsVisible="{Binding LocalIP, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <TextBlock Text="Server IP:" 
+                       VerticalAlignment="Center"
+                       FontSize="16"
+                       Foreground="#ca80de"
+                       FontWeight="Bold"/>
 
-    <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8">
-      <Button Content="Quit"
-              Command="{Binding CloseCanvasCommand}"
-              Foreground="White"
-              Background="#ca80de"/>
-      <Button Content="Undo" Click="Undo_Click" HotKey="Ctrl+z"/>
-      <Button Content="Clear" Click="Clear_Click"/>
-      <Button Content="Save" Click="SavePng_Click"/>
-    </StackPanel>
+            <TextBox Text="{Binding LocalIP}"
+                     Classes="text-block"
+                     IsReadOnly="True"
+                     Focusable="False"
+                     BorderBrush="Transparent"
+                     Background="Transparent"
+                     PasswordChar="•"
+                     RevealPassword="{Binding #EyeButton.IsChecked}"
+                     VerticalContentAlignment="Center"
+                     HorizontalContentAlignment="Right"
+                     FontSize="16"
+                     Foreground="#ca80de"
+                     FontWeight="Bold"
+                     HorizontalAlignment="Stretch"
+                     Height="20"
+                     Margin="5"
+                     Padding="0"/>
 
-      <Grid RowDefinitions="*, Auto" Grid.Row="1" Grid.Column="1" Margin="15, 15, 0, 0">
-          <TextBox Grid.Row="0"
-                   Classes="chat-box"
-                   Text="{Binding ChatHistory}"
-                   BorderThickness="2"
-                   VerticalAlignment="Stretch"
-                   Width="250"
-                   AcceptsReturn="True" 
-                   TextWrapping="Wrap"
-                   IsReadOnly="True"
-                   VerticalContentAlignment="Bottom"
-                   FontSize="12"
-                   CornerRadius="8"/>
-            <Grid Grid.Row="1" Margin="0, 5, 0, 15">
+            <ToggleButton Name="EyeButton"
+                          Classes="icon-toggle"
+                          ToolTip.Tip="Показать/скрыть IP"
+                          Focusable="False"
+                          Background="Transparent"
+                          Padding="0">
+                <Grid>
+                    <Image Source="/Assets/icon_vision.png" Height="20" Width="20" IsVisible="{Binding !#EyeButton.IsChecked}"/>
+                    <Image Source="/Assets/icon_hidden.png" Height="20" Width="20" IsVisible="{Binding #EyeButton.IsChecked}"/>
+                </Grid>
+            </ToggleButton>
+        </StackPanel>
+          
+          <Border Grid.Row="1"
+                BorderBrush="#ca80de"
+                BorderThickness="2"
+                Background="White"
+                CornerRadius="8"
+                ClipToBounds="True"
+                Margin="0,15">
+          <controls:DrawingCanvas x:Name="Board"
+                                  BrushColor="{Binding SelectedColor}"
+                                  BrushThickness="{Binding Thickness}"/>
+        </Border>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8">
+          <Button Content="Quit"
+                  Command="{Binding CloseCanvasCommand}"
+                  Foreground="White"
+                  Background="#ca80de"/>
+          <Button Content="Undo" Click="Undo_Click" HotKey="Ctrl+z"/>
+          <Button Content="Clear" Click="Clear_Click"/>
+          <Button Content="Save" Click="SavePng_Click"/>
+        </StackPanel>
+
+          <Grid RowDefinitions="*, Auto" Grid.Row="1" Grid.Column="1" Margin="15, 15, 0, 0">
+              <TextBox Grid.Row="0"
+                       Classes="chat-box"
+                       Text="{Binding ChatHistory}"
+                       BorderThickness="2"
+                       VerticalAlignment="Stretch"
+                       Width="250"
+                       AcceptsReturn="True" 
+                       TextWrapping="Wrap"
+                       IsReadOnly="True"
+                       VerticalContentAlignment="Bottom"
+                       FontSize="12"
+                       CornerRadius="8"/>
+                <Grid Grid.Row="1" Margin="0, 5, 0, 15">
     
-            <TextBox Classes="message-box"
-                     Text="{Binding UserInput}"
-                     BorderThickness="2"
-                     Height="30"
-                     Width="250"
-                     AcceptsReturn="True" 
-                     TextWrapping="Wrap"
-                     FontSize="12"
-                     CornerRadius="8"
-                     Padding="5, 5, 20, 5"/>
+                <TextBox Classes="message-box"
+                         Text="{Binding UserInput}"
+                         BorderThickness="2"
+                         Height="30"
+                         Width="250"
+                         AcceptsReturn="True" 
+                         TextWrapping="Wrap"
+                         FontSize="12"
+                         CornerRadius="8"
+                         Padding="5, 5, 20, 5"/>
 
-            <Button Classes="image-only-button"
-                    Command="{Binding SendUserMessageCommand}"
-                    HotKey="Enter"
-                    Width="24"
-                    Height="24"
-                    VerticalAlignment="Center"
-                    HorizontalAlignment="Right"
-                    Margin="0, 0, 6, 0">
-                <Image Source="/Assets/send.png" Width="22" Height="22"/>
-            </Button>
+                <Button Classes="image-only-button"
+                        Command="{Binding SendUserMessageCommand}"
+                        HotKey="Enter"
+                        Width="24"
+                        Height="24"
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Right"
+                        Margin="0, 0, 6, 0">
+                    <Image Source="/Assets/send.png" Width="22" Height="22"/>
+                </Button>
     
-        </Grid>
+            </Grid>
 
+          </Grid>
 
       </Grid>
-
-  </Grid>
 
 </UserControl>

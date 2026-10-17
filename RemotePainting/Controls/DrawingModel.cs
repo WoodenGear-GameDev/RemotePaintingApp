@@ -26,5 +26,6 @@ namespace RemotePainting.Controls
         event Action<DrawCommand>? CommandProduced;
         void Apply(DrawCommand cmd);
         List<DrawCommand> GetAllStrokeCommands();
+        void SetActive(bool active);
     }
 }

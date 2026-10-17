@@ -4,7 +4,6 @@ using CommunityToolkit.Mvvm.Input;
 using RemotePainting.Controls;
 using RemotePainting.Models;
 using RemotePainting.Networking;
-using System.Collections.Generic;
 
 namespace RemotePainting.ViewModels.Menus
 {
@@ -22,9 +21,15 @@ namespace RemotePainting.ViewModels.Menus
         private string _userInput = string.Empty;
         [ObservableProperty]
         private string _chatHistory = string.Empty;
+        [ObservableProperty]
+        private string _localIP = "";
+
+        [ObservableProperty]
+        private bool _isIpVisible = false;
 
         public CanvasVM(MainRootViewModel navigation, PaintingAppModel paintingAppModel)
         {
+            _localIP = string.Empty;
             _navigation = navigation;
             _paintingAppModel = paintingAppModel;
             _paintingAppModel.OnMessageReceived += ShowNewMessage;
@@ -33,6 +38,14 @@ namespace RemotePainting.ViewModels.Menus
         public void AttachBoard(IDrawingBoard board)
         {
             _paintingAppModel.AttachBoard(board);
+        }
+
+        public void GetLocalIP()
+        {
+            if (_paintingAppModel != null && _paintingAppModel.LocalIP != null)
+                LocalIP = _paintingAppModel.LocalIP;
+            else
+                throw new System.Exception("Server error: Cannot get IP");
         }
 
         public void ConnectToCanvas(ServerInfo serverInfo)

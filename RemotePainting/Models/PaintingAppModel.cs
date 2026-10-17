@@ -1,13 +1,11 @@
-﻿using RemotePainting.Controls;
+﻿using Avalonia.Threading;
+using RemotePainting.Controls;
 using RemotePainting.Networking;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using Tmds.DBus.Protocol;
 
 namespace RemotePainting.Models
 {
@@ -32,6 +30,8 @@ namespace RemotePainting.Models
 
         public bool HasSavedUserName { get; private set; }
         public string? UserNameLoadError { get; private set; }
+        public string? LocalIP { get; private set; } = string.Empty;
+        private bool _boardIsActive = false;
 
         public PaintingAppModel()
         {
@@ -42,6 +42,8 @@ namespace RemotePainting.Models
         {
             _drawingBoard = board;
             _drawingBoard.CommandProduced += SendDrawingData;
+
+            _drawingBoard.SetActive(_boardIsActive);
         }
 
         public void StartFindingServers(Action action)
@@ -81,7 +83,7 @@ namespace RemotePainting.Models
                 }
             }
 
-            _ = _networkService!.SyncClientBoard(clientInfo, dataList);
+            _ = ((Server)_networkService!).SyncClientBoard(clientInfo, dataList);
         }
 
         public void SendDrawingData(DrawCommand dCmd)
@@ -105,11 +107,11 @@ namespace RemotePainting.Models
                     data = "DRAW:CLEAR_ALL:";
                     break;
                 case CursorMove c:
-                    data = string.Create(IC, $"DRAW:CURSOR:{c.X}|{c.Y}|{UserName}");
+                    data = string.Create(IC, $"DRAW:CURSOR:{c.X}|{c.Y}");
                     break;
 
                 case CursorHide:
-                    data = $"DRAW:CURSOR_HIDE:{UserName}";
+                    data = $"DRAW:CURSOR_HIDE:";
                     break;
 
                 default:
@@ -142,7 +144,7 @@ namespace RemotePainting.Models
             string userName = args[0];
             string userMessage = message.Substring($"{userName}|".Length);
 
-            OnMessageReceived?.Invoke(userName, userMessage);
+            Dispatcher.UIThread.Post(() => OnMessageReceived?.Invoke(userName, userMessage));
         }
 
         public void ReceiveData(string data)
@@ -204,8 +206,8 @@ namespace RemotePainting.Models
                     break;
 
                 case "CURSOR_HIDE":
-                    if (args.Length >= 1 && args[0].Length > 0)
-                        ApplyDoOnBoard(new CursorHide(args[0]));
+                    if (args.Length >= 2 && args[1].Length > 0)
+                        ApplyDoOnBoard(new CursorHide(args[1]));
                     break;
 
                 default:
@@ -215,28 +217,48 @@ namespace RemotePainting.Models
 
         public void ApplyDoOnBoard(DrawCommand dCmd)
         {
-            _drawingBoard?.Apply(dCmd);
+            Dispatcher.UIThread.Post(() => _drawingBoard?.Apply(dCmd));
         }
 
         public void CreateNewCanvas()
         {
             _networkService = new Networking.Server(_port, UserName);
+
             _networkService.OnDataReceived += ReceiveMessage;
-            _networkService.Connected += LoadServerBoard;
-            _networkService.Start();
+            ((Server)_networkService).OnClientConnected += LoadServerBoard;
+
+            _networkService.Start(out string? localIP);
+            LocalIP = localIP;
+
+            _boardIsActive = true;
+            if (_drawingBoard != null)
+                _drawingBoard.SetActive(_boardIsActive);
         }
 
         public void ConnectToCanvas(ServerInfo serverInfo, Action disconectEvent)
         {
             _networkFinder.StopSearching();
             _networkService = new Networking.Client(serverInfo.IpAddress, serverInfo.Port, UserName);
+
             _networkService.OnDataReceived += ReceiveMessage;
-            _networkService.Disconnected += disconectEvent;
-            _networkService.Start();
+            ((Client)_networkService).OnDisconnectedFromServer += disconectEvent;
+            ((Client)_networkService).OnConnectedToServer += ActivateClientBoard;
+
+            _networkService.Start(out string? null_str);
+        }
+
+        public void ActivateClientBoard()
+        {
+            _boardIsActive = true;
+            if (_drawingBoard != null)
+                _drawingBoard.SetActive(_boardIsActive);
         }
 
         public void CloseCanvas()
         {
+            _drawingBoard = null;
+            _boardIsActive = false;
+
             _networkService?.Stop();
             _networkService = null;
         }

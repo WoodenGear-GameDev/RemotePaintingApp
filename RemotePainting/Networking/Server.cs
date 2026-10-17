@@ -1,11 +1,10 @@
-﻿using Avalonia.Threading;
-using Makaretu.Dns;
+﻿using Makaretu.Dns;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -29,8 +28,7 @@ namespace RemotePainting.Networking
     internal class Server : INetworkService
     {
         public event Action<string>? OnDataReceived;
-        public event Action<ClientInfo>? Connected;
-        public event Action? Disconnected;
+        public event Action<ClientInfo>? OnClientConnected;
         private readonly int _port;
         private const int MaxClients = 3;
         public bool IsRunning { get; private set; }
@@ -41,17 +39,58 @@ namespace RemotePainting.Networking
 
         private ServiceDiscovery? _serviceDiscovery;
         private ServiceProfile? _serviceProfile;
+        private IPAddress? _localIp;
 
         public Server(int port, string userName)
         {
             _port = port;
             _userName = userName;
+            _localIp = GetLocalIpAddress();
+        }
+
+        private static IPAddress GetLocalIpAddress()
+        {
+            try
+            {
+                var validInterfaces = NetworkInterface.GetAllNetworkInterfaces()
+                    .Where(ni => ni.OperationalStatus == OperationalStatus.Up &&
+                                 (ni.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 ||
+                                  ni.NetworkInterfaceType == NetworkInterfaceType.Ethernet) &&
+                                 !ni.Description.Contains("Virtual", StringComparison.OrdinalIgnoreCase) &&
+                                 !ni.Description.Contains("VPN", StringComparison.OrdinalIgnoreCase) &&
+                                 !ni.Description.Contains("TAP", StringComparison.OrdinalIgnoreCase) &&
+                                 !ni.Description.Contains("TUN", StringComparison.OrdinalIgnoreCase) &&
+                                 !ni.Name.Contains("vEthernet", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                foreach (var ni in validInterfaces)
+                {
+                    var ipProps = ni.GetIPProperties();
+                    if (ipProps.GatewayAddresses.Any(g => g.Address.AddressFamily == AddressFamily.InterNetwork && !g.Address.Equals(IPAddress.Any)))
+                    {
+                        var ipv4 = ipProps.UnicastAddresses
+                            .FirstOrDefault(addr => addr.Address.AddressFamily == AddressFamily.InterNetwork);
+                        if (ipv4 != null)
+                            return ipv4.Address;
+                    }
+                }
+
+                foreach (var ni in validInterfaces)
+                {
+                    var ipv4 = ni.GetIPProperties().UnicastAddresses
+                        .FirstOrDefault(addr => addr.Address.AddressFamily == AddressFamily.InterNetwork);
+                    if (ipv4 != null)
+                        return ipv4.Address;
+                }
+            }
+            catch { }
+
+            return IPAddress.Loopback;
         }
 
         public void StartAdvertising(string serverName, int tcpPort)
         {
-            _serviceProfile = new ServiceProfile(serverName, "_remotepainting._tcp", (ushort)tcpPort);
-
+            _serviceProfile = new ServiceProfile(serverName, "_remotepainting._tcp", (ushort)tcpPort, new[] { _localIp });
             _serviceDiscovery = new ServiceDiscovery();
             _serviceDiscovery.Advertise(_serviceProfile);
         }
@@ -62,8 +101,9 @@ namespace RemotePainting.Networking
             _serviceDiscovery?.Dispose();
         }
 
-        public void Start()
+        public void Start(out string? localIP)
         {
+            localIP = _localIp!.ToString();
             try
             {
                 _tcpListener = new TcpListener(IPAddress.Any, _port);
@@ -183,13 +223,21 @@ namespace RemotePainting.Networking
 
                     _currentClients.Add(clientInfo);
 
-                    messageBytes = Encoding.UTF8.GetBytes("WELCOME");
-                    await client.GetStream().WriteAsync(messageBytes, 0, messageBytes.Length, cancellationToken);
+                    try
+                    {
+                        messageBytes = Encoding.UTF8.GetBytes("WELCOME");
+                        await client.GetStream().WriteAsync(messageBytes, 0, messageBytes.Length, cancellationToken);
 
-                    OnDataReceived?.Invoke($"Message:{name}|I'm your new friend!");
-                    Connected?.Invoke(clientInfo);
+                        OnDataReceived?.Invoke($"Message:{name}|I'm here now!");
+                        _ = RetransmitData("I'm here now!", name);
+                        OnClientConnected?.Invoke(clientInfo);
 
-                    _ = StartListeningClientSignals(clientInfo, cancellationToken);
+                        _ = StartListeningClientSignals(clientInfo, cancellationToken);
+                    }
+                    catch (Exception)
+                    {
+                        HandleClientDisconnection(clientInfo);
+                    }
                 }
                 else
                 {
@@ -202,25 +250,42 @@ namespace RemotePainting.Networking
             }
         }
 
+        private void HandleClientDisconnection(ClientInfo clientInfo)
+        {
+            OnDataReceived?.Invoke($"Message:{clientInfo.Name}|I'm leaving now!");
+            _ = RetransmitData("I'm leaving now!", clientInfo.Name);
+
+            _currentClients.Remove(clientInfo);
+            clientInfo.Client.Close();
+        }
+
         public async Task SyncClientBoard(ClientInfo clientInfo, List<(string, string)> dataList)
         {
+            if (dataList.Count == 0) return;
+
             try
             {
-                byte[] messageBytes;
+                await Task.Delay(200);
+
+                var sb = new StringBuilder();
                 foreach (var (userName, data) in dataList)
                 {
                     if (data.StartsWith("DRAW:"))
                     {
                         string name = userName == "Me" ? _userName : userName;
-                        messageBytes = Encoding.UTF8.GetBytes($"{data}|{name}\n");
-                        await clientInfo.Client.GetStream().WriteAsync(messageBytes, 0, messageBytes.Length);
+                        sb.Append(data).Append('|').Append(name).Append('\n');
                     }
+                }
+
+                if (sb.Length > 0)
+                {
+                    byte[] messageBytes = Encoding.UTF8.GetBytes(sb.ToString());
+                    await clientInfo.Client.GetStream().WriteAsync(messageBytes, 0, messageBytes.Length);
                 }
             }
             catch (Exception)
             {
-                clientInfo.Client.Close();
-                _currentClients.Remove(clientInfo);
+                HandleClientDisconnection(clientInfo);
             }
         }
 
@@ -251,8 +316,6 @@ namespace RemotePainting.Networking
 
                         if (string.IsNullOrEmpty(data))
                         {
-                            clientInfo.Client.Close();
-                            _currentClients.Remove(clientInfo);
                             break;
                         }
 
@@ -273,8 +336,7 @@ namespace RemotePainting.Networking
                 }
                 finally
                 {
-                    clientInfo.Client.Close();
-                    _currentClients.Remove(clientInfo);
+                    HandleClientDisconnection(clientInfo);
                 }
             }
         }
@@ -307,8 +369,7 @@ namespace RemotePainting.Networking
 
             foreach (var clientInfo in disconnectedClients)
             {
-                clientInfo.Client.Close();
-                _currentClients.Remove(clientInfo);
+                HandleClientDisconnection(clientInfo);
             }
         }
 
@@ -341,8 +402,7 @@ namespace RemotePainting.Networking
             }
             foreach (var clientInfo in disconnectedClients)
             {
-                clientInfo.Client.Close();
-                _currentClients.Remove(clientInfo);
+                HandleClientDisconnection(clientInfo);
             }
         }
     }

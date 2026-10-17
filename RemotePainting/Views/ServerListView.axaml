@@ -43,16 +43,20 @@
                Foreground="#ca80de"
                Margin="0, 5, 0, 5"/>
 
-    <Grid Grid.Row="3" ColumnDefinitions="*, Auto, Auto">
+    <Grid Grid.Row="3" ColumnDefinitions="Auto, *, Auto">
         <TextBox Grid.Column="0"
             Classes="message-box"
             Text="{Binding IpAddress, Mode=TwoWay}"
-            PlaceholderText="192.168.1.10"
+            PlaceholderText="Enter server IP..."
+            MaxLength="15"
             BorderThickness="2"
             Height="30"
-            FontSize="12"
+            FontSize="14"
             CornerRadius="8"
-            Padding="5, 5, 5, 5">
+            Padding="10, 5, 10, 5"
+            Width="300"
+            HorizontalAlignment="Left"
+            VerticalContentAlignment="Center">
             <TextBox.KeyBindings>
                 <KeyBinding Gesture="Enter" Command="{Binding ConnectByIpCommand}"/>
             </TextBox.KeyBindings>
@@ -65,7 +69,7 @@
             Foreground="White"
             Background="#ca80de"
             HorizontalContentAlignment="Center"
-            Margin="10, 0, 200, 0"/>
+            Margin="10, 0, 0, 0"/>
         <Button Grid.Column="2"
             Content="Back"
             FontWeight="Bold"

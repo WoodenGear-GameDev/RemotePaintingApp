@@ -1,11 +1,6 @@
 ﻿using Avalonia.Threading;
-using Makaretu.Dns;
 using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.IO;
-using System.Linq;
-using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -27,8 +22,9 @@ namespace RemotePainting.Networking
     internal class Client : INetworkService
     {
         public event Action<string>? OnDataReceived;
-        public event Action<ClientInfo>? Connected;
-        public event Action? Disconnected;
+        public event Action? OnDisconnectedFromServer;
+        public event Action? OnConnectedToServer;
+        private int _isDisconnected = 0;
         private readonly string _serverIp = string.Empty;
         private readonly int _port;
         private TcpClient? _tcpClient;
@@ -45,13 +41,10 @@ namespace RemotePainting.Networking
 
         }
 
-        public async Task SyncClientBoard(ClientInfo clientInfo, List<(string, string)> data)
+        public void Start(out string? localIP)
         {
-            Stop();
-        }
+            localIP = null;
 
-        public void Start()
-        {
             _tcpClient = new TcpClient();
             _ = ConnectToServer();
         }
@@ -68,15 +61,19 @@ namespace RemotePainting.Networking
 
             try
             {
-                await _tcpClient!.ConnectAsync(_serverIp, _port, _cts.Token);
+                using var connectTimeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token, connectTimeoutCts.Token);
 
-                _stream = _tcpClient.GetStream();
-                _ = Registration(_stream, _cts.Token);
+                await _tcpClient!.ConnectAsync(_serverIp, _port, linkedCts.Token);
+
+                _ = Registration(_tcpClient.GetStream(), _cts.Token);
 
                 await Task.Delay(Timeout.Infinite, _cts.Token);
             }
             catch (OperationCanceledException)
             {
+                if (!_cts.IsCancellationRequested)
+                    HandleDisconnection();
             }
             catch (Exception)
             {
@@ -122,8 +119,10 @@ namespace RemotePainting.Networking
                     string response = Encoding.UTF8.GetString(buffer, 0, byteAmount);
 
                     if (response == "WELCOME")
-                    {
+                    { 
+                        _stream = stream;
                         _ = StartListeningServer(stream, cancellationToken);
+                        OnConnectedToServer?.Invoke();
                     }
                     else
                     {
@@ -137,7 +136,8 @@ namespace RemotePainting.Networking
             }
             catch (OperationCanceledException)
             {
-                HandleDisconnection();
+                if (!_cts!.IsCancellationRequested)
+                    HandleDisconnection();
             }
             catch (Exception)
             {
@@ -147,9 +147,12 @@ namespace RemotePainting.Networking
 
         private void HandleDisconnection()
         {
-            _cts?.Cancel();
-            _tcpClient?.Close();
-            Disconnected?.Invoke();
+            if (Interlocked.Exchange(ref _isDisconnected, 1) == 1)
+                return;
+
+            Stop();
+
+            Dispatcher.UIThread.Post(() => OnDisconnectedFromServer?.Invoke());
         }
 
         private async Task StartListeningServer(Stream stream, CancellationToken cancellationToken)
@@ -162,32 +165,43 @@ namespace RemotePainting.Networking
                     while (!cancellationToken.IsCancellationRequested)
                     {
 
-                        string? data = await reader.ReadLineAsync();
+                        string? data = await reader.ReadLineAsync(cancellationToken);
 
                         if (string.IsNullOrEmpty(data))
                         {
-                            Disconnected?.Invoke();
+                            HandleDisconnection();
                             break;
                         }
 
                         OnDataReceived?.Invoke(data);
                     }
                 }
+                catch (OperationCanceledException)
+                {
+                    if (!_cts!.IsCancellationRequested)
+                        HandleDisconnection();
+                }
                 catch (Exception)
                 {
-                }
-                finally
-                {
-                    Disconnected?.Invoke();
+                    HandleDisconnection();
                 }
             }
         }
 
         public async Task SendData(string message)
         {
-            byte[] messageBytes = Encoding.UTF8.GetBytes($"{message}\n");
+            if (_stream == null || _cts == null || _cts.IsCancellationRequested)
+                return;
 
-            await _stream!.WriteAsync(messageBytes, 0, messageBytes.Length, _cts!.Token);
+            try
+            {
+                byte[] messageBytes = Encoding.UTF8.GetBytes($"{message}\n");
+                await _stream.WriteAsync(messageBytes, 0, messageBytes.Length, _cts.Token);
+            }
+            catch (Exception)
+            {
+                HandleDisconnection();
+            }
         }
     }
 }

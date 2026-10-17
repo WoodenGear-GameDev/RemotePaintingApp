@@ -16,12 +16,9 @@ namespace RemotePainting.Networking
     public interface INetworkService
     {
         event Action<string> OnDataReceived;
-        event Action Disconnected;
-        event Action<ClientInfo> Connected;
 
-        void Start();
+        void Start(out string? localIP);
         void Stop();
         Task SendData(string data);
-        Task SyncClientBoard(ClientInfo clientInfo, List<(string, string)> dataList);
     }
 }

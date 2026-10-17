@@ -31,13 +31,20 @@ namespace RemotePainting.Networking
 
             _serviceDiscovery.ServiceInstanceDiscovered += (s, e) =>
             {
+                if (!e.ServiceInstanceName.ToString().Contains("_remotepainting._tcp", StringComparison.OrdinalIgnoreCase))
+                    return;
+
                 var allRecords = e.Message.Answers.Cast<ResourceRecord>()
                     .Concat(e.Message.AdditionalRecords)
                     .Concat(e.Message.AuthorityRecords);
 
                 foreach (var answer in allRecords.OfType<SRVRecord>())
                 {
-                    string hostName = answer.Target.ToString().TrimEnd('.');
+                    if (!answer.Name.ToString().Contains("_remotepainting._tcp", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    string hostName = answer.Name.Labels.FirstOrDefault() ?? answer.Target.ToString().TrimEnd('.');
+
                     int port = answer.Port;
 
                     var ipRecord = allRecords

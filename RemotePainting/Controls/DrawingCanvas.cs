@@ -54,6 +54,12 @@ namespace RemotePainting.Controls
         };
 
         public event Action<DrawCommand>? CommandProduced;
+        private bool _boardIsActive = false;
+
+        public void SetActive(bool active)
+        {
+            _boardIsActive = active;
+        }
 
         public void Apply(DrawCommand cmd)
         {
@@ -94,6 +100,9 @@ namespace RemotePainting.Controls
 
         private void Do(DrawCommand cmd)
         {
+            if (!_boardIsActive)
+                return;
+
             Apply(cmd);
             CommandProduced?.Invoke(cmd);
         }
@@ -139,6 +148,9 @@ namespace RemotePainting.Controls
 
         protected override void OnPointerPressed(PointerPressedEventArgs e)
         {
+            if (!_boardIsActive)
+                return;
+
             if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
             if (Bounds.Width <= 0 || Bounds.Height <= 0) return;
 
@@ -151,7 +163,7 @@ namespace RemotePainting.Controls
 
         protected override void OnPointerMoved(PointerEventArgs e)
         {
-            if (Bounds.Width <= 0 || Bounds.Height <= 0) return;
+            if (Bounds.Width <= 0 || Bounds.Height <= 0 || !_boardIsActive) return;
 
             var p = Norm(e.GetPosition(this));
 
